@@ -5,7 +5,7 @@ const fs = require("fs")
 const path = require("path")
 const { glob } = require("glob-gitignore")
 const ignore = require("ignore")
-const { promiseSequence, promisifyNodeCallback, promisify } = require("./promise-helper.js")
+const { promiseSequence, promisifyNodeCallback } = require("./promise-helper.js")
 
 const getFileContent = promisifyNodeCallback(fs.readFile)
 const getFileContentAsString = path => getFileContent(path).then(String)
@@ -24,10 +24,65 @@ const findFilesForTest = (location = process.cwd()) => {
 	)
 }
 
-const fromFile = file => ({
-	file,
-	run: promisify(require(file)) // eslint-disable-line import/no-dynamic-require
-})
+const fromFile = file => {
+	const defaultExport = require(file) // eslint-disable-line import/no-dynamic-require
+	const run = () => {
+		let timeoutid
+		const cancelTimeout = () => {
+			if (timeoutid !== undefined) {
+				clearTimeout(timeoutid)
+				timeoutid = undefined
+			}
+		}
+		let resolveResult
+		const resultPromise = new Promise(resolve => {
+			resolveResult = resolve
+		})
+		const pass = message => {
+			cancelTimeout()
+			resolveResult({
+				failed: false,
+				message
+			})
+		}
+		const fail = message => {
+			cancelTimeout()
+			resolveResult({
+				failed: true,
+				message
+			})
+		}
+
+		const allocateMs = ms => {
+			cancelTimeout()
+			timeoutid = setTimeout(() => fail(`must pass or fail in less than ${ms}ms`), 100)
+		}
+		allocateMs(100)
+
+		try {
+			// when returning a promise we could wait for that promise to pass/fail
+			// still have to write some tests to see the need
+			defaultExport({
+				pass,
+				fail,
+				allocateMs
+			})
+		} catch (e) {
+			if (e && e.name === "AssertionError") {
+				fail(e.message)
+			} else {
+				throw e
+			}
+		}
+
+		return resultPromise
+	}
+
+	return {
+		file,
+		run
+	}
+}
 const fromFiles = files => files.map(fromFile)
 
 // we are running tests in sequence and not in parallel because they are likely going to fail
