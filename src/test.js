@@ -26,7 +26,7 @@ const findFilesForTest = (location = process.cwd()) => {
 
 const fromFile = file => {
 	const defaultExport = require(file) // eslint-disable-line import/no-dynamic-require
-	const run = () => {
+	const run = ({ onResult }) => {
 		let timeoutid
 		const cancelTimeout = () => {
 			if (timeoutid !== undefined) {
@@ -34,20 +34,16 @@ const fromFile = file => {
 				timeoutid = undefined
 			}
 		}
-		let resolveResult
-		const resultPromise = new Promise(resolve => {
-			resolveResult = resolve
-		})
 		const pass = message => {
 			cancelTimeout()
-			resolveResult({
+			onResult({
 				failed: false,
 				message
 			})
 		}
 		const fail = message => {
 			cancelTimeout()
-			resolveResult({
+			onResult({
 				failed: true,
 				message
 			})
@@ -64,13 +60,6 @@ const fromFile = file => {
 			fail,
 			allocateMs
 		})
-
-		// for now we're using a promise for convenience
-		// but the try/catch behaviour of promise annoys me and I would like to let my process crash
-		// when unexpected error happens
-		// the test can try/catch fn execution to catch AssertionError is they want but at least
-		// the runnet tries not to do that
-		return resultPromise
 	}
 
 	return {
@@ -83,7 +72,16 @@ const fromFiles = files => files.map(fromFile)
 // we are running tests in sequence and not in parallel because they are likely going to fail
 // when they fail we want the failure to be reproductible, if they run in parallel we introduce
 // race condition, non determinism, etc: bad idea
-const test = ({ location = process.cwd(), before = () => {}, after = () => {} }) => {
+
+// we are using promise for convenience but ideally we'll remove that to avoid promise try/catching
+// which is so annoying
+const test = ({
+	location = process.cwd(),
+	before = () => {},
+	after = () => {},
+	failed = () => {},
+	passed = () => {}
+}) => {
 	let report = []
 
 	return findFilesForTest(location)
@@ -91,21 +89,35 @@ const test = ({ location = process.cwd(), before = () => {}, after = () => {} })
 		.then(tests => {
 			return promiseSequence(tests, test => {
 				before(test)
-				return test.run().then(result => {
-					report.push({
-						test,
-						result
+				return new Promise((resolve, reject) => {
+					test.run({
+						onResult: result => {
+							report.push({
+								test,
+								result
+							})
+							after(test, result)
+							if (result.failed) {
+								reject(report)
+							} else {
+								resolve()
+							}
+						}
 					})
-					after(test, result)
-					if (result.failed) {
-						return Promise.reject(report)
-					}
-					return report
 				})
 			})
 		})
-		.catch(exception => {
-			return exception === report ? report : Promise.reject(exception)
-		})
+		.then(
+			() => passed(report),
+			exception => {
+				if (exception === report) {
+					failed(report)
+					return
+				}
+				setTimeout(() => {
+					throw exception
+				})
+			}
+		)
 }
 exports.test = test

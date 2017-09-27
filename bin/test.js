@@ -15,24 +15,19 @@ test({
 		} else {
 			log("passed")
 		}
+	},
+	failed: report => {
+		const failedReports = report.filter(report => report.result.failed)
+
+		if (failedReports.length === 1) {
+			warn(`${failedReports[0].test.file} failed`)
+		} else {
+			warn(`${failedReports.length} tests failed`)
+		}
+		process.exit(1)
+	},
+	passed: () => {
+		log(`perfecto!`)
+		process.exit(0)
 	}
 })
-	.then(report => {
-		const failedReports = report.filter(report => report.result.failed)
-		if (failedReports.length) {
-			if (failedReports.length === 1) {
-				warn(`${failedReports[0].test.file} failed`)
-			} else {
-				warn(`${failedReports.length} tests failed`)
-			}
-			process.exit(1)
-		} else {
-			log(`perfecto!`)
-			process.exit(0)
-		}
-	})
-	.catch(error =>
-		setTimeout(() => {
-			throw error
-		})
-	)
