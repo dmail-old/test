@@ -1,19 +1,15 @@
 #!/usr/bin/env node
 
-console.log("top of test bin")
-
 const { test } = require("../index.js")
 
 const cwd = process.cwd()
 const log = (...args) => console.log(...args)
 const warn = (...args) => console.warn(...args)
 
-console.log("testing", cwd)
-
 test({
 	location: cwd,
 	before: ({ file }) => {
-		log(`executing ${file}`)
+		log(`test ${file}`)
 	},
 	after: ({ file }, { failed, message = "unspecified" }) => {
 		if (failed) {
