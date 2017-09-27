@@ -9,11 +9,11 @@ test({
 	before: ({ file }) => {
 		log(`executing ${file}`)
 	},
-	after: ({ file }, { failed }) => {
+	after: ({ file }, { failed, message = "unspecified" }) => {
 		if (failed) {
-			warn(`failed`)
+			warn(`failed because: ${message}`)
 		} else {
-			log("passed")
+			log(`passed because: ${message}`)
 		}
 	},
 	failed: report => {
@@ -26,8 +26,12 @@ test({
 		}
 		process.exit(1)
 	},
-	passed: () => {
-		log(`perfecto!`)
+	passed: report => {
+		if (report.length === 0) {
+			log("perfecto! (no test to run xD)")
+		} else {
+			log(`perfecto! (${report.length} tests passed)`)
+		}
 		process.exit(0)
 	}
 })

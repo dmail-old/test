@@ -12,62 +12,23 @@ const getFileContentAsString = path => getFileContent(path).then(String)
 const getOptionalFileContentAsString = path =>
 	getFileContentAsString(path).catch(e => (e && e.code === "ENOENT" ? "" : Promise.reject(e)))
 
+const include = "dist/**/*.test.*"
+const exclude = "dist/**/*.test.*.map"
+
 const findFilesForTest = (location = process.cwd()) => {
 	const absoluteLocation = path.resolve(process.cwd(), location)
 	return getOptionalFileContentAsString(
-		path.join(absoluteLocation, ".execignore")
+		path.join(absoluteLocation, ".testignore")
 	).then(ignoreRules =>
-		glob("dist/*.test.*", {
+		glob(include, {
 			cwd: absoluteLocation,
-			ignore: ignore().add(ignoreRules)
+			ignore: ignore()
+				.add(exclude)
+				.add(ignoreRules)
 		})
 	)
 }
-
-const fromFile = file => {
-	const defaultExport = require(file) // eslint-disable-line import/no-dynamic-require
-	const run = ({ onResult }) => {
-		let timeoutid
-		const cancelTimeout = () => {
-			if (timeoutid !== undefined) {
-				clearTimeout(timeoutid)
-				timeoutid = undefined
-			}
-		}
-		const pass = message => {
-			cancelTimeout()
-			onResult({
-				failed: false,
-				message
-			})
-		}
-		const fail = message => {
-			cancelTimeout()
-			onResult({
-				failed: true,
-				message
-			})
-		}
-
-		const allocateMs = ms => {
-			cancelTimeout()
-			timeoutid = setTimeout(() => fail(`must pass or fail in less than ${ms}ms`), 100)
-		}
-		allocateMs(100)
-
-		defaultExport({
-			pass,
-			fail,
-			allocateMs
-		})
-	}
-
-	return {
-		file,
-		run
-	}
-}
-const fromFiles = files => files.map(fromFile)
+exports.list = findFilesForTest
 
 // we are running tests in sequence and not in parallel because they are likely going to fail
 // when they fail we want the failure to be reproductible, if they run in parallel we introduce
@@ -83,6 +44,61 @@ const test = ({
 	passed = () => {}
 }) => {
 	let report = []
+
+	const fromFile = file => {
+		const filePath = path.resolve(location, file)
+		const fileExports = require(filePath) // eslint-disable-line import/no-dynamic-require
+		const run = ({ onResult }) => {
+			let timeoutid
+			const cancelTimeout = () => {
+				if (timeoutid !== undefined) {
+					clearTimeout(timeoutid)
+					timeoutid = undefined
+				}
+			}
+			const pass = message => {
+				cancelTimeout()
+				onResult({
+					failed: false,
+					message
+				})
+			}
+			const fail = message => {
+				cancelTimeout()
+				onResult({
+					failed: true,
+					message
+				})
+			}
+
+			const allocateMs = ms => {
+				cancelTimeout()
+				timeoutid = setTimeout(() => fail(`must pass or fail in less than ${ms}ms`), 100)
+			}
+			allocateMs(100)
+
+			if ("default" in fileExports) {
+				const defaultExport = fileExports.default
+				if (typeof defaultExport === "function") {
+					defaultExport({
+						pass,
+						fail,
+						allocateMs
+					})
+				} else {
+					fail("file export default must be a function")
+				}
+			} else {
+				fail("missing default export")
+			}
+		}
+
+		return {
+			file,
+			run
+		}
+	}
+	const fromFiles = files => files.map(fromFile)
 
 	return findFilesForTest(location)
 		.then(fromFiles)
