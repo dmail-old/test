@@ -131,6 +131,7 @@ const test = ({
 					return
 				}
 				setTimeout(() => {
+					console.error("an exception occured", exception)
 					throw exception
 				})
 			}
