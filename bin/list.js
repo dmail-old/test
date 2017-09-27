@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 const { list } = require("../index.js")
 
 const cwd = process.cwd()
@@ -10,9 +12,8 @@ list(cwd).then(
 		}
 		process.exit(0)
 	},
-	error => {
+	error =>
 		setTimeout(() => {
 			throw error
 		})
-	}
 )

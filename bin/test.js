@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 const { test } = require("../index.js")
 
 const cwd = process.cwd()
@@ -18,12 +20,7 @@ test({
 	},
 	failed: report => {
 		const failedReports = report.filter(report => report.result.failed)
-
-		if (failedReports.length === 1) {
-			warn(`${failedReports[0].test.file} failed`)
-		} else {
-			warn(`${failedReports.length} tests failed`)
-		}
+		warn(`${failedReports.length} tests failed`)
 		process.exit(1)
 	},
 	passed: report => {
