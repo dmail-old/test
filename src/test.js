@@ -59,22 +59,17 @@ const fromFile = file => {
 		}
 		allocateMs(100)
 
-		try {
-			// when returning a promise we could wait for that promise to pass/fail
-			// still have to write some tests to see the need
-			defaultExport({
-				pass,
-				fail,
-				allocateMs
-			})
-		} catch (e) {
-			if (e && e.name === "AssertionError") {
-				fail(e.message)
-			} else {
-				throw e
-			}
-		}
+		defaultExport({
+			pass,
+			fail,
+			allocateMs
+		})
 
+		// for now we're using a promise for convenience
+		// but the try/catch behaviour of promise annoys me and I would like to let my process crash
+		// when unexpected error happens
+		// the test can try/catch fn execution to catch AssertionError is they want but at least
+		// the runnet tries not to do that
 		return resultPromise
 	}
 
