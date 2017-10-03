@@ -8,7 +8,7 @@ const fs = require("fs")
 const path = require("path")
 const { glob } = require("glob-gitignore")
 const ignore = require("ignore")
-const { promiseSequence, promisifyNodeCallback } = require("./promise-helper.js")
+const { promisifyNodeCallback } = require("./promise-helper.js")
 
 const getFileContent = promisifyNodeCallback(fs.readFile)
 const getFileContentAsString = path => getFileContent(path).then(String)
@@ -51,6 +51,62 @@ exports.list = findFilesForTest
 // when they fail we want the failure to be reproductible, if they run in parallel we introduce
 // race condition, non determinism, etc: bad idea
 
+const createTestFromFile = path => {
+	const fileExports = require(path) // eslint-disable-line import/no-dynamic-require
+	return ({ fail, pass, allocateMs }) => {
+		if ("default" in fileExports === false) {
+			return fail("missing default export")
+		}
+		const defaultExport = fileExports.default
+		if (typeof defaultExport !== "function") {
+			return fail("file export default must be a function")
+		}
+		defaultExport({
+			pass,
+			fail,
+			allocateMs
+		})
+	}
+}
+const createTestExecution = ({ onResult }) => {
+	let timeoutid
+	const cancelTimeout = () => {
+		if (timeoutid !== undefined) {
+			clearTimeout(timeoutid)
+			timeoutid = undefined
+		}
+	}
+	const pass = message => {
+		cancelTimeout()
+		onResult({
+			failed: false,
+			message
+		})
+	}
+	const fail = message => {
+		cancelTimeout()
+		onResult({
+			failed: true,
+			message
+		})
+	}
+
+	const allocateMs = ms => {
+		cancelTimeout()
+		timeoutid = setTimeout(() => fail(`must pass or fail in less than ${ms}ms`), 100)
+	}
+	allocateMs(100)
+
+	return {
+		pass,
+		fail,
+		allocateMs,
+		onResult
+	}
+}
+
+const callback = () => {}
+
 // we are using promise for convenience but ideally we'll remove that to avoid promise try/catching
 // which is so annoying
 const test = ({
@@ -64,50 +120,12 @@ const test = ({
 
 	const fromFile = file => {
 		const filePath = path.resolve(location, file)
-		const fileExports = require(filePath) // eslint-disable-line import/no-dynamic-require
-		const run = ({ onResult }) => {
-			let timeoutid
-			const cancelTimeout = () => {
-				if (timeoutid !== undefined) {
-					clearTimeout(timeoutid)
-					timeoutid = undefined
-				}
-			}
-			const pass = message => {
-				cancelTimeout()
-				onResult({
-					failed: false,
-					message
-				})
-			}
-			const fail = message => {
-				cancelTimeout()
-				onResult({
-					failed: true,
-					message
-				})
-			}
-
-			const allocateMs = ms => {
-				cancelTimeout()
-				timeoutid = setTimeout(() => fail(`must pass or fail in less than ${ms}ms`), 100)
-			}
-			allocateMs(100)
-
-			if ("default" in fileExports) {
-				const defaultExport = fileExports.default
-				if (typeof defaultExport === "function") {
-					defaultExport({
-						pass,
-						fail,
-						allocateMs
-					})
-				} else {
-					fail("file export default must be a function")
-				}
-			} else {
-				fail("missing default export")
-			}
+		const fileTest = createTestFromFile(filePath)
+		const run = () => {
+			return callback(() => {
+				const testExecution = createTestExecution({ onResult })
+				fileTest(testExecution)
+			})
 		}
 
 		return {
@@ -117,52 +135,24 @@ const test = ({
 	}
 	const fromFiles = files => files.map(fromFile)
 
-	return Promise.resolve()
-		.then(() => findSourceFiles(location))
-		.then(sourceFiles => {
-			// the first thing we do is to require all source files
-			// so that if tests are not executing their codes
-			// they will be reported as not covered ;)
+	return callback()
+		.chain(() => findSourceFiles(location))
+		.chain(sourceFiles => {
 			sourceFiles.forEach(sourceFile => {
 				const sourcePath = path.resolve(location, sourceFile)
 				require(sourcePath) // eslint-disable-line import/no-dynamic-require
 			})
 		})
-		.then(() => findFilesForTest(location))
-		.then(fromFiles)
-		.then(tests => {
-			return promiseSequence(tests, test => {
-				before(test)
-				return new Promise((resolve, reject) => {
-					test.run({
-						onResult: result => {
-							report.push({
-								test,
-								result
-							})
-							after(test, result)
-							if (result.failed) {
-								reject(report)
-							} else {
-								resolve()
-							}
-						}
-					})
-				})
+		.chain(() => findFilesForTest(location))
+		.chain(fromFiles)
+		.sequence(test => {
+			before(test)
+			return test.run().always(result => {
+				after(test, result)
+				return result
 			})
 		})
-		.then(
-			() => passed(report),
-			exception => {
-				if (exception === report) {
-					failed(report)
-					return
-				}
-				setTimeout(() => {
-					console.error("an exception occured", exception)
-					throw exception
-				})
-			}
-		)
+		.chain(() => passed(report))
+		.chainFailed(() => failed(report))
 }
 exports.test = test
