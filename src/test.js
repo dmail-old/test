@@ -1,5 +1,8 @@
+// https://github.com/kaelzhang/node-ignore
+// https://github.com/kaelzhang/node-glob-gitignore
 // https://karma-runner.github.io/latest/config/plugins.html
 // https://karma-runner.github.io/latest/dev/plugins.html
+// https://www.npmjs.com/package/glob#options
 
 const fs = require("fs")
 const path = require("path")
@@ -12,18 +15,32 @@ const getFileContentAsString = path => getFileContent(path).then(String)
 const getOptionalFileContentAsString = path =>
 	getFileContentAsString(path).catch(e => (e && e.code === "ENOENT" ? "" : Promise.reject(e)))
 
-const include = "dist/**/*.test.*"
-const exclude = "dist/**/*.test.*.map"
+const sourceFileInclude = ["dist/**"]
+const testFileInclude = ["dist/**/*.test.*"]
+
+const sourceFileExclude = ["dist/**/*.map", testFileInclude]
+const testFileExclude = ["dist/**/*.map"]
+
+const findSourceFiles = (location = process.cwd()) => {
+	const absoluteLocation = path.resolve(process.cwd(), location)
+	return glob(sourceFileInclude, {
+		nodir: true,
+		cwd: absoluteLocation,
+		ignore: ignore().add(sourceFileExclude)
+	})
+}
+exports.listSource = findSourceFiles
 
 const findFilesForTest = (location = process.cwd()) => {
 	const absoluteLocation = path.resolve(process.cwd(), location)
 	return getOptionalFileContentAsString(
 		path.join(absoluteLocation, ".testignore")
 	).then(ignoreRules =>
-		glob(include, {
+		glob(testFileInclude, {
+			nodir: true,
 			cwd: absoluteLocation,
 			ignore: ignore()
-				.add(exclude)
+				.add(testFileExclude)
 				.add(ignoreRules)
 		})
 	)
@@ -100,7 +117,20 @@ const test = ({
 	}
 	const fromFiles = files => files.map(fromFile)
 
-	return findFilesForTest(location)
+	// we don't have to require sourceFiles, the all option in nycrc does this for us
+	// .then(() => findSourceFiles(location)
+	// .then(sourceFiles => {
+	// 	// the first thing we do is to require all source files
+	// 	// so that if tests are not executing their codes
+	// 	// they will be reported as not covered ;)
+	// 	sourceFiles.forEach(sourceFile => {
+	// 		const sourcePath = path.resolve(location, sourceFile)
+	// 		require(sourcePath)
+	// 	})
+	// })
+
+	return Promise.resolve()
+		.then(() => findFilesForTest(location))
 		.then(fromFiles)
 		.then(tests => {
 			return promiseSequence(tests, test => {
