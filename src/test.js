@@ -117,19 +117,17 @@ const test = ({
 	}
 	const fromFiles = files => files.map(fromFile)
 
-	// we don't have to require sourceFiles, the all option in nycrc does this for us
-	// .then(() => findSourceFiles(location)
-	// .then(sourceFiles => {
-	// 	// the first thing we do is to require all source files
-	// 	// so that if tests are not executing their codes
-	// 	// they will be reported as not covered ;)
-	// 	sourceFiles.forEach(sourceFile => {
-	// 		const sourcePath = path.resolve(location, sourceFile)
-	// 		require(sourcePath)
-	// 	})
-	// })
-
 	return Promise.resolve()
+		.then(() => findSourceFiles(location))
+		.then(sourceFiles => {
+			// the first thing we do is to require all source files
+			// so that if tests are not executing their codes
+			// they will be reported as not covered ;)
+			sourceFiles.forEach(sourceFile => {
+				const sourcePath = path.resolve(location, sourceFile)
+				require(sourcePath) // eslint-disable-line import/no-dynamic-require
+			})
+		})
 		.then(() => findFilesForTest(location))
 		.then(fromFiles)
 		.then(tests => {
