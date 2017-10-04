@@ -28,3 +28,5 @@ const assertResult = (action, expectedResult) => assert.equal(action.getResult()
 	assertPassed(action)
 	assertResult(action, recoverValue)
 }
+
+console.log("action tests passed")

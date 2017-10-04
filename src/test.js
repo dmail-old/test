@@ -162,8 +162,11 @@ const test = ({
 				aroundAction(
 					() => beforeEachFile(testFile),
 					() => createTestFromFile(testFile),
-					report => {
-						afterEachFile(testFile, report)
+					(report, passed) => {
+						afterEachFile(testFile, {
+							state: passed ? "passed" : "failed",
+							result: report
+						})
 						compositeResult[testFile] = report
 					}
 				)

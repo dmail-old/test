@@ -3,32 +3,48 @@
 const { test } = require("../index.js")
 
 const cwd = process.cwd()
-const log = (...args) => console.log(...args)
-const warn = (...args) => console.warn(...args)
+const log = (...args) => process.stdout.write(...args)
+const warn = (...args) => process.stdout.write(...args)
 
 test({
 	location: cwd,
-	before: ({ file }) => {
-		log(`test ${file}`)
+	beforeEachFile: file => {
+		log(`test ${file}
+		`)
 	},
-	after: ({ file }, { failed, message = "unspecified" }) => {
-		if (failed) {
-			warn(`failed because: ${message}`)
+	beforeEachTest: description => {
+		log(`	ensure ${description}:`)
+	},
+	afterEachTest: (description, report) => {
+		if (report.state === "failed") {
+			warn(`failed`)
 		} else {
-			log(`passed because: ${message}`)
+			log(`passed`)
 		}
 	},
-	failed: report => {
-		const failedReports = report.filter(report => report.result.failed)
-		warn(`${failedReports.length} tests failed`)
-		process.exit(1)
-	},
-	passed: report => {
-		if (report.length === 0) {
-			log("perfecto! (no test to run xD)")
+	afterEachFile: (file, report) => {
+		if (report.state === "failed") {
+			warn(`
+failed
+			`)
 		} else {
-			log(`perfecto! (${report.length} tests passed)`)
+			log(`
+passed
+			`)
+		}
+	}
+}).then(
+	report => {
+		if (report.length === 0) {
+			log(`perfecto! (no test to run xD)
+			`)
+		} else {
+			log(`perfecto! (${report.length} tests passed)
+			`)
 		}
 		process.exit(0)
+	},
+	() => {
+		process.exit(1)
 	}
-})
+)
