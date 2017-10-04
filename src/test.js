@@ -5,15 +5,23 @@
 // https://www.npmjs.com/package/glob#options
 
 const fs = require("fs")
-const path = require("path")
+const nodepath = require("path")
 const { glob } = require("glob-gitignore")
 const ignore = require("ignore")
-const { promisifyNodeCallback } = require("./promise-helper.js")
+const {
+	fromFunction,
+	fromNodeCallbackRecoveringWhen,
+	sequence,
+	passed,
+	aroundAction
+} = require("./action.js")
 
-const getFileContent = promisifyNodeCallback(fs.readFile)
-const getFileContentAsString = path => getFileContent(path).then(String)
-const getOptionalFileContentAsString = path =>
-	getFileContentAsString(path).catch(e => (e && e.code === "ENOENT" ? "" : Promise.reject(e)))
+const getOptionalFileContent = fromNodeCallbackRecoveringWhen(
+	fs.readFile,
+	error => error.code === "ENOENT",
+	""
+)
+const getOptionalFileContentAsString = path => getOptionalFileContent(path).then(String)
 
 const sourceFileInclude = ["dist/**"]
 const testFileInclude = ["dist/**/*.test.*"]
@@ -22,7 +30,7 @@ const sourceFileExclude = ["dist/**/*.map", testFileInclude]
 const testFileExclude = ["dist/**/*.map"]
 
 const findSourceFiles = (location = process.cwd()) => {
-	const absoluteLocation = path.resolve(process.cwd(), location)
+	const absoluteLocation = nodepath.resolve(process.cwd(), location)
 	return glob(sourceFileInclude, {
 		nodir: true,
 		cwd: absoluteLocation,
@@ -32,9 +40,9 @@ const findSourceFiles = (location = process.cwd()) => {
 exports.listSource = findSourceFiles
 
 const findFilesForTest = (location = process.cwd()) => {
-	const absoluteLocation = path.resolve(process.cwd(), location)
+	const absoluteLocation = nodepath.resolve(process.cwd(), location)
 	return getOptionalFileContentAsString(
-		path.join(absoluteLocation, ".testignore")
+		nodepath.join(absoluteLocation, ".testignore")
 	).then(ignoreRules =>
 		glob(testFileInclude, {
 			nodir: true,
@@ -47,112 +55,145 @@ const findFilesForTest = (location = process.cwd()) => {
 }
 exports.list = findFilesForTest
 
-// we are running tests in sequence and not in parallel because they are likely going to fail
-// when they fail we want the failure to be reproductible, if they run in parallel we introduce
-// race condition, non determinism, etc: bad idea
+const createTest = (fn, { beforeEach = () => {}, afterEach = () => {} } = {}) => {
+	const report = {}
 
-const createTestFromFile = path => {
-	const fileExports = require(path) // eslint-disable-line import/no-dynamic-require
-	return ({ fail, pass, allocateMs }) => {
-		if ("default" in fileExports === false) {
-			return fail("missing default export")
-		}
-		const defaultExport = fileExports.default
-		if (typeof defaultExport !== "function") {
-			return fail("file export default must be a function")
-		}
-		defaultExport({
-			pass,
-			fail,
-			allocateMs
+	const createTestFromFunction = fn =>
+		fromFunction(({ pass, fail }) => {
+			// chaque test a par défaut 100ms pour pass/fail et peut utiliser
+			// allocateMs pour diminuer/augmenter/supprimer ce timeout
+
+			let timeoutid
+			const cancelTimeout = () => {
+				if (timeoutid !== undefined) {
+					clearTimeout(timeoutid)
+					timeoutid = undefined
+				}
+			}
+			const passTest = value => {
+				cancelTimeout()
+				pass(value)
+			}
+			const failTest = value => {
+				cancelTimeout()
+				fail(value)
+			}
+			const allocateMs = ms => {
+				cancelTimeout()
+				timeoutid = setTimeout(() => fail(`must pass or fail in less than ${ms}ms`), 100)
+			}
+			allocateMs(100)
+
+			fn({
+				pass: passTest,
+				fail: failTest,
+				allocateMs
+			})
 		})
+
+	const createEnsureHook = () => {
+		const ensureFactories = []
+		const ensure = (description, fn) => {
+			const ensureFactory = () => {
+				aroundAction(
+					() => beforeEach(description),
+					() => createTestFromFunction(fn),
+					(result, passed) => {
+						report[description] = {
+							status: passed ? "passed" : "failed",
+							result
+						}
+						afterEach(description, result)
+					}
+				)
+			}
+			ensureFactories.push(ensureFactory)
+		}
+
+		return fn => {
+			fn(ensure)
+			return sequence(ensureFactories, ensureFactory => ensureFactory())
+		}
 	}
+
+	return createEnsureHook()(fn).then(() => report, () => report)
 }
-const createTestExecution = ({ onResult }) => {
-	let timeoutid
-	const cancelTimeout = () => {
-		if (timeoutid !== undefined) {
-			clearTimeout(timeoutid)
-			timeoutid = undefined
-		}
-	}
-	const pass = message => {
-		cancelTimeout()
-		onResult({
-			failed: false,
-			message
-		})
-	}
-	const fail = message => {
-		cancelTimeout()
-		onResult({
-			failed: true,
-			message
-		})
-	}
 
-	const allocateMs = ms => {
-		cancelTimeout()
-		timeoutid = setTimeout(() => fail(`must pass or fail in less than ${ms}ms`), 100)
-	}
-	allocateMs(100)
-
-	return {
-		pass,
-		fail,
-		allocateMs,
-		onResult
-	}
-}
-
-const callback = () => {}
-
-// we are using promise for convenience but ideally we'll remove that to avoid promise try/catching
-// which is so annoying
 const test = ({
 	location = process.cwd(),
-	before = () => {},
-	after = () => {},
-	failed = () => {},
-	passed = () => {}
+	beforeEachFile = () => {},
+	beforeEachTest = () => {},
+	afterEachTest = () => {},
+	afterEachFile = () => {}
 }) => {
-	let report = []
+	const compositeResult = {}
 
-	const fromFile = file => {
-		const filePath = path.resolve(location, file)
-		const fileTest = createTestFromFile(filePath)
-		const run = () => {
-			return callback(() => {
-				const testExecution = createTestExecution({ onResult })
-				fileTest(testExecution)
-			})
-		}
+	const createTestFromFile = file =>
+		fromFunction(({ fail, pass }) => {
+			const absoluteLocation = nodepath.resolve(location, file)
+			const fileExports = require(absoluteLocation) // eslint-disable-line import/no-dynamic-require
+			if ("default" in fileExports === false) {
+				return fail("missing default export")
+			}
+			const defaultExport = fileExports.default
+			if (typeof defaultExport !== "function") {
+				return fail("file export default must be a function")
+			}
 
-		return {
-			file,
-			run
-		}
-	}
-	const fromFiles = files => files.map(fromFile)
+			return pass(
+				createTest(defaultExport, { beforeEach: beforeEachTest, afterEach: afterEachTest })
+			)
+		})
 
-	return callback()
-		.chain(() => findSourceFiles(location))
-		.chain(sourceFiles => {
+	return passed()
+		.then(() => findSourceFiles(location))
+		.then(sourceFiles =>
 			sourceFiles.forEach(sourceFile => {
-				const sourcePath = path.resolve(location, sourceFile)
+				const sourcePath = nodepath.resolve(location, sourceFile)
 				require(sourcePath) // eslint-disable-line import/no-dynamic-require
 			})
-		})
-		.chain(() => findFilesForTest(location))
-		.chain(fromFiles)
-		.sequence(test => {
-			before(test)
-			return test.run().always(result => {
-				after(test, result)
-				return result
-			})
-		})
-		.chain(() => passed(report))
-		.chainFailed(() => failed(report))
+		)
+		.then(() => findFilesForTest(location))
+		.then(testFiles =>
+			// we are running tests in sequence and not in parallel because they are likely going to fail
+			// when they fail we want the failure to be reproductible, if they run in parallel we introduce
+			// race condition, non determinism, etc: bad idea
+			sequence(testFiles, testFile =>
+				aroundAction(
+					() => beforeEachFile(testFile),
+					() => createTestFromFile(testFile),
+					report => {
+						afterEachFile(testFile, report)
+						compositeResult[testFile] = report
+					}
+				)
+			)
+		)
+		.then(() => compositeResult, () => compositeResult)
 }
 exports.test = test
+
+// const testFoo = value =>
+// 	createTest(
+// 		ensure => {
+// 			ensure("when you do that it does sething", ({ fail, pass }) => {
+// 				if (value !== "foo") {
+// 					return fail("value must be foo")
+// 				}
+// 				return pass("value is foo")
+// 			})
+
+// 			ensure("when you do something else it does amazing stuff", ({ fail, pass }) => {
+// 				return pass("yeah")
+// 			})
+// 		},
+// 		{
+// 			beforeEach: path => {
+// 				console.log("before", path.join(" "))
+// 			},
+// 			afterEach: (path, result) => {
+// 				console.log("after", path.join(" "), result)
+// 			}
+// 		}
+// 	)
+// testFoo("foo").then()
