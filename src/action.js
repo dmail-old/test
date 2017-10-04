@@ -242,6 +242,12 @@ const aroundAction = (before, actionCreator, after) => {
 }
 exports.aroundAction = aroundAction
 
+const fromPromise = promise =>
+	fromFunction(({ pass, fail }) => {
+		promise.then(value => setTimeout(pass, 0, value), reason => setTimeout(fail, 1, reason))
+	})
+exports.fromPromise = fromPromise
+
 const fromNodeCallback = fn => (...args) =>
 	fromFunction(({ pass }) => {
 		fn(...args, (error, data) => {

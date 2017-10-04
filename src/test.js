@@ -10,6 +10,7 @@ const { glob } = require("glob-gitignore")
 const ignore = require("ignore")
 const {
 	fromFunction,
+	fromPromise,
 	fromNodeCallbackRecoveringWhen,
 	sequence,
 	passed,
@@ -31,11 +32,13 @@ const testFileExclude = ["dist/**/*.map"]
 
 const findSourceFiles = (location = process.cwd()) => {
 	const absoluteLocation = nodepath.resolve(process.cwd(), location)
-	return glob(sourceFileInclude, {
-		nodir: true,
-		cwd: absoluteLocation,
-		ignore: ignore().add(sourceFileExclude)
-	})
+	return fromPromise(
+		glob(sourceFileInclude, {
+			nodir: true,
+			cwd: absoluteLocation,
+			ignore: ignore().add(sourceFileExclude)
+		})
+	)
 }
 exports.listSource = findSourceFiles
 
@@ -44,13 +47,15 @@ const findFilesForTest = (location = process.cwd()) => {
 	return getOptionalFileContentAsString(
 		nodepath.join(absoluteLocation, ".testignore")
 	).then(ignoreRules =>
-		glob(testFileInclude, {
-			nodir: true,
-			cwd: absoluteLocation,
-			ignore: ignore()
-				.add(testFileExclude)
-				.add(ignoreRules)
-		})
+		fromPromise(
+			glob(testFileInclude, {
+				nodir: true,
+				cwd: absoluteLocation,
+				ignore: ignore()
+					.add(testFileExclude)
+					.add(ignoreRules)
+			})
+		)
 	)
 }
 exports.list = findFilesForTest
