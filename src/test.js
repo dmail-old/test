@@ -84,7 +84,7 @@ const createTest = (fn, { beforeEach = () => {}, afterEach = () => {} } = {}) =>
 			}
 			allocateMs(100)
 
-			fn({
+			return fn({
 				pass: passTest,
 				fail: failTest,
 				allocateMs
@@ -129,7 +129,7 @@ const test = ({
 	const compositeResult = {}
 
 	const createTestFromFile = file =>
-		fromFunction(({ fail, pass }) => {
+		fromFunction(({ fail }) => {
 			const absoluteLocation = nodepath.resolve(location, file)
 			const fileExports = require(absoluteLocation) // eslint-disable-line import/no-dynamic-require
 			if ("default" in fileExports === false) {
@@ -139,10 +139,7 @@ const test = ({
 			if (typeof defaultExport !== "function") {
 				return fail("file export default must be a function")
 			}
-
-			return pass(
-				createTest(defaultExport, { beforeEach: beforeEachTest, afterEach: afterEachTest })
-			)
+			return createTest(defaultExport, { beforeEach: beforeEachTest, afterEach: afterEachTest })
 		})
 
 	return passed()

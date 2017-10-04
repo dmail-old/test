@@ -1,14 +1,16 @@
 const isAction = value => value && typeof value.then === "function"
 
 const createAction = () => {
-	let state = "running"
+	let state = "unknown"
 	let result
 
 	const action = {}
-	const isRunning = () => state === "running"
+	const isPassing = () => state === "passing"
+	const isFailing = () => state === "failing"
 	const isPassed = () => state === "passed"
 	const isFailed = () => state === "failed"
-	const isEnded = () => state !== "running"
+	const isRunning = () => state === "unknown" || isPassing() || isFailing()
+	const isEnded = () => isPassed() || isFailed()
 	const pendingActions = []
 
 	const runPendingActions = () => {
@@ -17,50 +19,53 @@ const createAction = () => {
 		})
 		pendingActions.length = 0
 	}
-	const handleResult = () => {
-		if (isPassed() && isAction(result)) {
-			if (result === action) {
-				throw new TypeError("an action cannot pass with itself")
-			}
-			result.then(
-				value => {
-					state = "passed"
-					result = value
-					handleResult()
-				},
-				value => {
-					state = "failed"
-					result = value
-					handleResult()
+	const handleResult = (value, passing) => {
+		if (passing) {
+			state = "passing"
+			if (isAction(value)) {
+				if (result === action) {
+					throw new TypeError("an action cannot pass with itself")
 				}
-			)
+				value.then(
+					value => {
+						if (isRunning()) {
+							handleResult(value, true)
+						}
+					},
+					value => {
+						if (isRunning()) {
+							handleResult(value, false)
+						}
+					}
+				)
+			} else {
+				state = "passed"
+				result = value
+				runPendingActions()
+			}
 		} else {
+			state = "failed"
+			result = value
 			runPendingActions()
 		}
 	}
 	const fail = value => {
-		if (isFailed()) {
+		if (isFailed() || isFailing()) {
 			throw new Error(`fail must be called once`)
 		}
 		if (isPassed()) {
 			throw new Error(`fail must not be called after pass was called`)
 		}
-
-		state = "failed"
-		result = value
-		handleResult()
+		handleResult(value, false)
 	}
 	const pass = value => {
-		if (isPassed()) {
+		if (isPassing() || isPassed()) {
 			throw new Error(`pass must be called once`)
 		}
 		if (isFailed()) {
 			throw new Error(`pass must not be called after fail was called`)
 		}
-
-		state = "passed"
-		result = value
-		handleResult()
+		handleResult(value, true)
 	}
 	const then = (onPassed, onFailed) => {
 		const nextAction = createAction()
@@ -95,6 +100,8 @@ const createAction = () => {
 	Object.assign(action, {
 		getState,
 		getResult,
+		isPassing,
+		isFailing,
 		isPassed,
 		isFailed,
 		isRunning,
@@ -110,7 +117,10 @@ exports.createAction = createAction
 
 const fromFunction = fn => {
 	const action = createAction()
-	fn(action)
+	const returnValue = fn(action)
+	if (isAction(returnValue)) {
+		returnValue.then(action.pass, action.fail)
+	}
 	return action
 }
 exports.fromFunction = fromFunction

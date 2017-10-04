@@ -10,10 +10,10 @@ test({
 	location: cwd,
 	beforeEachFile: file => {
 		log(`test ${file}
-		`)
+`)
 	},
 	beforeEachTest: description => {
-		log(`	ensure ${description}:`)
+		log(`	ensure ${description}: `)
 	},
 	afterEachTest: (description, report) => {
 		if (report.state === "failed") {
@@ -26,21 +26,25 @@ test({
 		if (report.state === "failed") {
 			warn(`
 failed
-			`)
+`)
 		} else {
+			const testCount = Object.keys(report.result).length
 			log(`
-passed
-			`)
+passed (${testCount} tests)
+`)
 		}
 	}
 }).then(
 	report => {
-		if (report.length === 0) {
-			log(`perfecto! (no test to run xD)
-			`)
+		const fileCount = Object.keys(report).length
+		if (fileCount === 0) {
+			log(`
+perfecto! (no files ^^')
+`)
 		} else {
-			log(`perfecto! (${report.length} tests passed)
-			`)
+			log(`
+perfecto! (${fileCount} files)
+`)
 		}
 		process.exit(0)
 	},
