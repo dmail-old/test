@@ -92,36 +92,13 @@ const createTest = (fn, { beforeEach = () => {}, afterEach = () => {} } = {}) =>
 			return fn({
 				pass: passTest,
 				fail: failTest,
+				beforeEach,
+				afterEach,
 				allocateMs
 			})
 		})
 
-	const createEnsureHook = () => {
-		const ensureFactories = []
-		const ensure = (description, fn) => {
-			const ensureFactory = () => {
-				aroundAction(
-					() => beforeEach(description),
-					() => createTestFromFunction(fn),
-					(result, passed) => {
-						report[description] = {
-							status: passed ? "passed" : "failed",
-							result
-						}
-						afterEach(description, result)
-					}
-				)
-			}
-			ensureFactories.push(ensureFactory)
-		}
-
-		return fn => {
-			fn(ensure)
-			return sequence(ensureFactories, ensureFactory => ensureFactory())
-		}
-	}
-
-	return createEnsureHook()(fn).then(() => report, () => report)
+	return createTestFromFunction(fn).then(() => report, () => report)
 }
 
 const test = ({
@@ -150,6 +127,7 @@ const test = ({
 	return passed()
 		.then(() => findSourceFiles(location))
 		.then(sourceFiles =>
+			// we require all source files for code coverage
 			sourceFiles.forEach(sourceFile => {
 				const sourcePath = nodepath.resolve(location, sourceFile)
 				require(sourcePath) // eslint-disable-line import/no-dynamic-require
