@@ -9,7 +9,6 @@ const nodepath = require("path")
 const { glob } = require("glob-gitignore")
 const ignore = require("ignore")
 const {
-	fromFunction,
 	fromPromise,
 	fromNodeCallbackRecoveringWhen,
 	sequence,
@@ -60,69 +59,35 @@ const findFilesForTest = (location = process.cwd()) => {
 }
 exports.list = findFilesForTest
 
-const createTest = (fn, { beforeEach = () => {}, afterEach = () => {} } = {}) => {
-	const report = {}
-
-	const createTestFromFunction = fn =>
-		fromFunction(({ pass, fail }) => {
-			// chaque test a par défaut 100ms pour pass/fail et peut utiliser
-			// allocateMs pour diminuer/augmenter/supprimer ce timeout
-
-			let timeoutid
-			const cancelTimeout = () => {
-				if (timeoutid !== undefined) {
-					clearTimeout(timeoutid)
-					timeoutid = undefined
-				}
-			}
-			const passTest = value => {
-				cancelTimeout()
-				pass(value)
-			}
-			const failTest = value => {
-				cancelTimeout()
-				fail(value)
-			}
-			const allocateMs = ms => {
-				cancelTimeout()
-				timeoutid = setTimeout(() => fail(`must pass or fail in less than ${ms}ms`), 100)
-			}
-			allocateMs(100)
-
-			return fn({
-				pass: passTest,
-				fail: failTest,
-				beforeEach,
-				afterEach,
-				allocateMs
-			})
-		})
-
-	return createTestFromFunction(fn).then(() => report, () => report)
-}
-
 const test = ({
 	location = process.cwd(),
+	allocatedMs = 100,
 	beforeEachFile = () => {},
 	beforeEachTest = () => {},
 	afterEachTest = () => {},
 	afterEachFile = () => {}
 }) => {
-	const compositeResult = {}
+	const compositeReport = {}
 
 	const createTestFromFile = file =>
-		fromFunction(({ fail }) => {
-			const absoluteLocation = nodepath.resolve(location, file)
-			const fileExports = require(absoluteLocation) // eslint-disable-line import/no-dynamic-require
-			if ("default" in fileExports === false) {
-				return fail("missing default export")
-			}
-			const defaultExport = fileExports.default
-			if (typeof defaultExport !== "function") {
-				return fail("file export default must be a function")
-			}
-			return createTest(defaultExport, { beforeEach: beforeEachTest, afterEach: afterEachTest })
-		})
+		fromFunctionWithAllocableMs(
+			createFunctionComposingParams(
+				{ beforeEach: beforeEachTest, afterEach: afterEachTest },
+				params => {
+					const absoluteLocation = nodepath.resolve(location, file)
+					const fileExports = require(absoluteLocation) // eslint-disable-line import/no-dynamic-require
+					if ("default" in fileExports === false) {
+						return params.fail("missing default export")
+					}
+					const defaultExport = fileExports.default
+					if (typeof defaultExport !== "function") {
+						return params.fail("file export default must be a function")
+					}
+					params.allocateMs(allocatedMs)
+					return defaultExport(params)
+				}
+			)
+		)
 
 	return passed()
 		.then(() => findSourceFiles(location))
@@ -147,12 +112,12 @@ const test = ({
 							state: passed ? "passed" : "failed",
 							result: report
 						})
-						compositeResult[testFile] = report
+						compositeReport[testFile] = report
 					}
 				)
 			)
 		)
-		.then(() => compositeResult, () => compositeResult)
+		.then(() => compositeReport, () => compositeReport)
 }
 exports.test = test
 
