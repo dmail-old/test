@@ -1,7 +1,7 @@
 {
 	"name": "@dmail/test",
-	"version": "1.2.0",
-	"licence": "MIT",
+	"version": "1.0.0",
+	"license": "MIT",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/dmail/test"
@@ -9,22 +9,64 @@
 	"publishConfig": {
 		"access": "public"
 	},
+	"main": "dist/index.js",
+	"module": "index.js",
+	"files": ["dist", "src"],
+	"engines": {
+		"node": ">=8.6.0"
+	},
 	"bin": {
 		"test-run": "./bin/run.js",
 		"test-list": "./bin/list.js"
 	},
 	"dependencies": {
+		"@dmail/action": "1.0.0",
 		"glob-gitignore": "1.0.5",
 		"ignore": "3.3.5"
 	},
 	"devDependencies": {
+		"@dmail/command": "0.1.1",
+		"@dmail/ensure": "0.0.2",
+		"@dmail/prettiest": "0.1.4",
+		"@dmail/test-cheap": "0.0.2",
 		"@dmail/shared-config": "1.1.1",
+		"babel-cli": "7.0.0-beta.0",
+		"babel-core": "7.0.0-beta.0",
 		"babel-eslint": "8.0.0",
+		"babel-preset-env": "2.0.0-beta.0",
+		"codecov": "2.3.0",
 		"eslint": "3.19.0",
 		"eslint-plugin-import": "2.6.0",
-		"prettier": "1.7.0"
+		"mock-fs": "4.4.2",
+		"nyc": "11.2.1",
+		"prettier": "1.7.0",
+		"rimraf": "2.6.2"
 	},
 	"scripts": {
-		"test": "node ./src/action.test.js && node ./src/test.test.js"
+		"code-compile": "babel . --out-dir dist --ignore=node_modules,dist --source-maps",
+		"code-clean": "rimraf dist",
+		"code-build": "npm run code-clean && npm run code-compile",
+		"code-watch": "babel . --watch --out-dir dist --ignore=node_modules,dist --source-maps",
+		"code-lint": "eslint .",
+		"code-format": "prettiest",
+		"test-before": "npm run code-lint && npm run code-format && npm run code-compile",
+		"test-all": "node ./dist/src/all/all.test.js",
+		"test-action": "node ./dist/src/action.test.js",
+		"test-passed": "node ./dist/src/passed/passed.test.js",
+		"test-from-function": "node ./dist/src/fromFunction/fromFunction.test.js",
+		"test-run": "test-run",
+		"test": "npm run test-before && npm run test-run",
+		"test-cover": "npm run test-before && nyc npm run test-run",
+		"test-cover-clean": "rimraf .nyc_output && rimraf coverage && rimraf coverage.lcov",
+		"test-cover-html": "nyc report --reporter=lcov",
+		"test-cover-lcov": "nyc report --reporter=text-lcov > coverage.lcov",
+		"test-cover-upload":
+			"npm run test-cover-lcov && codecov --token=33b885f3-15b3-486f-82f2-3a4009e45d2b",
+		"repo-reset": "npm run code-clean && npm run test-cover-clean && rimraf node_modules",
+		"repo-reinstall": "npm run repo-reset && npm install",
+		"build": "npm run code-build",
+		"compile": "npm run code-compile",
+		"prepublishOnly": "npm run code-build",
+		"reinstall": "npm run repo-reinstall"
 	}
 }

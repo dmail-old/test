@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
-const { test } = require("../index.js")
+const { createPackageTest } = require("../index.js")
 
 const cwd = process.cwd()
 const log = (...args) => process.stdout.write(...args)
 const warn = (...args) => process.stdout.write(...args)
 
-test({
+createPackageTest({
 	location: cwd,
 	beforeEachFile: file => {
 		log(`test ${file}
