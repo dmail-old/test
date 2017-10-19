@@ -5,10 +5,10 @@
 // https://www.npmjs.com/package/glob#options
 
 import nodepath from "path"
-import { composeSequenceWithAllocatedMs, mutateAction, reduce, failed } from "@dmail/action"
+import { composeSequenceWithAllocatedMs, mutateAction, chainFunctions, failed } from "@dmail/action"
 import { findSourceFiles, findFilesForTest } from "./findFiles.js"
 
-export const createPackateTest = ({
+export const createPackageTest = ({
 	location = process.cwd(),
 	allocatedMs = 100,
 	beforeEachFile = () => {},
@@ -16,7 +16,7 @@ export const createPackateTest = ({
 	afterEachTest = () => {},
 	afterEachFile = () => {}
 }) =>
-	reduce([
+	chainFunctions([
 		// we require source files so that code coverage know their existence and can report
 		// their coverage (in case no test cover them they still appear in the report)@
 		() => findSourceFiles(location),
@@ -45,8 +45,8 @@ export const createPackateTest = ({
 							return failed("file export default must be a function")
 						}
 						return defaultExport({
-							beforeEach: beforeEachTest,
-							afterEach: afterEachTest
+							beforeEach: (...args) => beforeEachTest(testFile, ...args),
+							afterEach: (...args) => afterEachTest(testFile, ...args)
 						})
 					}).then(
 						result => afterEachFile(testFile, result, true),
