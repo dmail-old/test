@@ -11,9 +11,8 @@ const createExpectationsFromObject = expectationsObject =>
 export const createTest = expectationsObject => {
 	const expectations = createExpectationsFromObject(expectationsObject)
 	const runTest = ({ beforeEach = () => {}, afterEach = () => {}, allocatedMs } = {}) =>
-		composeSequenceWithAllocatedMs(
-			expectations,
-			(action, { description, fn }) => {
+		composeSequenceWithAllocatedMs(expectations, {
+			handle: (action, { description, fn }) => {
 				beforeEach(description)
 				mutateAction(action, fn).then(
 					result => afterEach(description, result, true),
@@ -22,7 +21,7 @@ export const createTest = expectationsObject => {
 				return action
 			},
 			allocatedMs
-		)
+		})
 
 	/* istanbul ignore next: internal usage, not meant to be used nor maintained */
 	runTest["@@autorun"] = () =>

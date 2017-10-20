@@ -52,12 +52,7 @@ test("createTest.js", ({ ensure }) => {
 		assert.equal(action.getState(), "unknown")
 		clock.tick(allocatedMs)
 		assert.equal(action.getState(), "failed")
-		assert.deepEqual(action.getResult(), [
-			{
-				state: "failed",
-				result: `must pass or fail in less than ${allocatedMs}ms`
-			}
-		])
+		assert.deepEqual(action.getResult(), `must pass or fail in less than ${allocatedMs}ms`)
 		assert.doesNotThrow(() => clock.tick(requiredMs))
 
 		clock.uninstall()
