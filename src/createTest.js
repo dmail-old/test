@@ -24,6 +24,7 @@ export const createTest = expectationsObject => {
 			allocatedMs
 		)
 
+	/* istanbul ignore next: internal usage, not meant to be used nor maintained */
 	runTest["@@autorun"] = () =>
 		runTest({
 			beforeEach: description => {
