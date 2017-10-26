@@ -65,7 +65,7 @@
 		"test-cover-text": "nyc report --reporter=text-summary",
 		"test-cover-table": "nyc report --reporter=text",
 		"test-cover-lcov": "nyc report --reporter=text-lcov > coverage.lcov",
-		"test-cover-upload": "codecov --token=33b885f3-15b3-486f-82f2-3a4009e45d2b",
+		"test-cover-upload": "codecov --token=c40d5a0f-fa92-4f78-b29c-07c44ddf7a35",
 		"repo-reset": "npm run code-clean && npm run test-cover-clean && rimraf node_modules",
 		"repo-reinstall": "npm run repo-reset && npm install",
 		"build": "npm run code-build",
