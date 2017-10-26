@@ -4,4 +4,5 @@ node_js:
 script:
  - npm run test-cover
 after_success:
+ - npm run test-cover-text
  - npm run test-cover-upload

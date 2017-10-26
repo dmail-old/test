@@ -17,7 +17,7 @@ export const findSourceFiles = (location = process.cwd()) => {
 		glob(sourceFileInclude, {
 			nodir: true,
 			cwd: absoluteLocation,
-			ignore: ignore().add(sourceFileExclude)
+			ignore: sourceFileExclude
 		})
 	)
 }
@@ -31,17 +31,19 @@ const getOptionalFileContentAsString = path => getOptionalFileContent(path).then
 
 export const findFilesForTest = (location = process.cwd()) => {
 	const absoluteLocation = nodepath.resolve(process.cwd(), location)
-	return getOptionalFileContentAsString(
-		nodepath.join(absoluteLocation, ".testignore")
-	).then(ignoreRules =>
-		fromPromise(
-			glob(testFileInclude, {
-				nodir: true,
-				cwd: absoluteLocation,
-				ignore: ignore()
-					.add(testFileExclude)
-					.add(ignoreRules)
-			})
+	return getOptionalFileContentAsString(nodepath.join(absoluteLocation, ".testignore"))
+		.then(ignoreRules =>
+			ignore()
+				.add(testFileExclude)
+				.add(ignoreRules)
 		)
-	)
+		.then(ignore =>
+			fromPromise(
+				glob(testFileInclude, {
+					nodir: true,
+					cwd: absoluteLocation,
+					ignore: ignore._rules.map(({ origin }) => origin)
+				})
+			)
+		)
 }
