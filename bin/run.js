@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const { createPackageTest } = require("../dist/index.js")
+import { createPackageTest } from "../index.js"
 
 const cwd = process.cwd()
 const log = (...args) => process.stdout.write(...args)

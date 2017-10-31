@@ -1,6 +1,6 @@
 {
 	"name": "@dmail/test",
-	"version": "2.1.0",
+	"version": "2.2.0",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
@@ -20,8 +20,8 @@
 		"node": ">=8.6.0"
 	},
 	"bin": {
-		"test-list": "./bin/list.js",
-		"test-run": "./bin/run.js"
+		"test-list": "./dist/bin/list.js",
+		"test-run": "./dist/bin/run.js"
 	},
 	"dependencies": {
 		"@dmail/action": "1.6.0",
