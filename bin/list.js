@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const { findFilesForTest } = require("../index.js")
+const { findFilesForTest } = require("../dist/index.js")
 
 const cwd = process.cwd()
 

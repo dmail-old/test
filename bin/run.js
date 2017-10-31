@@ -1,54 +1,68 @@
 #!/usr/bin/env node
 
-const { createPackageTest } = require("../index.js")
+const { createPackageTest } = require("../dist/index.js")
 
 const cwd = process.cwd()
 const log = (...args) => process.stdout.write(...args)
 const warn = (...args) => process.stdout.write(...args)
+const test = createPackageTest({
+	location: cwd
+})
 
-createPackageTest({
-	location: cwd,
-	beforeEachFile: file => {
-		log(`test ${file}
-`)
-	},
-	beforeEachTest: description => {
-		log(`	ensure ${description}: `)
-	},
-	afterEachTest: (description, report) => {
-		if (report.state === "failed") {
-			warn(`failed`)
-		} else {
-			log(`passed`)
-		}
-	},
-	afterEachFile: (file, report) => {
-		if (report.state === "failed") {
-			warn(`
-failed
-`)
-		} else {
-			const testCount = Object.keys(report.result).length
-			log(`
-passed (${testCount} tests)
-`)
-		}
+const createBeforeEachFileMessage = file => `test ${file}
+`
+const createBeforeEachTestMessage = description => `	${description}: `
+const createFailedTestMessage = () => `failed
+`
+const createPassedTestMessage = () => `passed
+`
+const createFailedFileMessage = () => `failed
+
+`
+const createPassedFileMessage = report => {
+	const testCount = Object.keys(report).length
+	return `passed (${testCount} tests)
+
+`
+}
+const createPassedMessage = report => {
+	const fileCount = Object.keys(report).length
+	if (fileCount === 0) {
+		return `perfecto! (no files ^^')
+`
 	}
-}).then(
-	report => {
-		const fileCount = Object.keys(report).length
-		if (fileCount === 0) {
-			log(`
-perfecto! (no files ^^')
-`)
-		} else {
-			log(`
-perfecto! (${fileCount} files)
-`)
-		}
+	return `perfecto! (${fileCount} files)
+`
+}
+
+const beforeEachFile = file => log(createBeforeEachFileMessage(file))
+const beforeEachTest = (file, description) => log(createBeforeEachTestMessage(description))
+const afterEachTest = (description, report) => {
+	if (report.state === "failed") {
+		warn(createFailedTestMessage())
+	} else {
+		log(createPassedTestMessage())
+	}
+}
+const afterEachFile = (file, report, passed) => {
+	if (passed) {
+		log(createPassedFileMessage(report))
+	} else {
+		warn(createFailedFileMessage(report))
+	}
+}
+const afterAll = (report, passed) => {
+	if (passed) {
+		log(createPassedMessage(report))
 		process.exit(0)
-	},
-	() => {
+	} else {
 		process.exit(1)
 	}
-)
+}
+
+test({
+	beforeEachFile,
+	beforeEachTest,
+	afterEachTest,
+	afterEachFile
+}).then(report => afterAll(report, true), report => afterAll(report, false))

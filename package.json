@@ -1,6 +1,6 @@
 {
 	"name": "@dmail/test",
-	"version": "1.0.0",
+	"version": "2.1.0",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
@@ -11,16 +11,20 @@
 	},
 	"main": "dist/index.js",
 	"module": "index.js",
-	"files": ["dist", "src"],
+	"files": [
+		"bin",
+		"dist",
+		"src"
+	],
 	"engines": {
 		"node": ">=8.6.0"
 	},
 	"bin": {
-		"test-run": "./bin/run.js",
-		"test-list": "./bin/list.js"
+		"test-list": "./bin/list.js",
+		"test-run": "./bin/run.js"
 	},
 	"dependencies": {
-		"@dmail/action": "1.5.0",
+		"@dmail/action": "1.6.0",
 		"glob-gitignore": "1.0.5",
 		"ignore": "3.3.5"
 	},
@@ -53,10 +57,6 @@
 		"code-format": "prettiest",
 		"code-list": "prettiest-list",
 		"test-before": "npm run code-lint && npm run code-format && npm run code-compile",
-		"test-all": "node ./dist/src/all/all.test.js",
-		"test-action": "node ./dist/src/action.test.js",
-		"test-passed": "node ./dist/src/passed/passed.test.js",
-		"test-from-function": "node ./dist/src/fromFunction/fromFunction.test.js",
 		"test-run": "test-run",
 		"test": "npm run test-before && npm run test-run",
 		"test-cover": "npm run test-before && nyc npm run test-run",

@@ -68,18 +68,19 @@ const getExportedTest = location => {
 }
 
 export const createPackageTest = ({ location = process.cwd() }) => params =>
-	chainFunctions([
+	chainFunctions(
 		// we require source files so that code coverage know their existence and can report
 		// their coverage (in case no test cover them they still appear in the report)@
 		() => requireAllSourceFiles(location),
 		() => findFilesForTest(location),
-		() =>
+		files =>
 			composeFileTests(
 				Object.assign(
 					{
+						files,
 						getFileTest: file => getExportedTest(nodepath.resolve(location, file))
 					},
 					params
 				)
-			)
-	])
+			)(params)
+	)
