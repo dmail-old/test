@@ -37,11 +37,11 @@ const createPassedMessage = report => {
 
 const beforeEachFile = file => log(createBeforeEachFileMessage(file))
 const beforeEachTest = (file, description) => log(createBeforeEachTestMessage(description))
-const afterEachTest = (description, report) => {
-	if (report.state === "failed") {
-		warn(createFailedTestMessage())
-	} else {
+const afterEachTest = (file, description, report, passed) => {
+	if (passed) {
 		log(createPassedTestMessage())
+	} else {
+		warn(createFailedTestMessage())
 	}
 }
 const afterEachFile = (file, report, passed) => {

@@ -37,6 +37,19 @@ test("createTest.js", ({ ensure }) => {
 		assert.equal(typeof expectationFunction.getReport(0).argValues[0].allocateMs, "function")
 	})
 
+	ensure("afterEach on failed test", () => {
+		const afterEach = createSpy()
+		const description = "desc"
+		const value = 1
+		const test = createTest({
+			[description]: ({ fail }) => fail(value)
+		})
+		test({
+			afterEach
+		})
+		assert.deepEqual(afterEach.getReport(0).argValues, [description, value, false])
+	})
+
 	ensure("expectation taking too much time to pass", () => {
 		const clock = install()
 		const allocatedMs = 10
