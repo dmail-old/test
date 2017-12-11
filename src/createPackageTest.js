@@ -13,6 +13,7 @@ import {
 	failed
 } from "@dmail/action"
 import { findSourceFiles, findFilesForTest } from "./findFiles.js"
+import { createTest } from "./createTest.js"
 
 export const composeFileTests = ({ files, getFileTest }) => (
 	{
@@ -55,16 +56,19 @@ const requireAllSourceFiles = location =>
 		})
 	)
 
+const testExportName = "test"
+
 const getExportedTest = location => {
 	const fileExports = require(location) // eslint-disable-line import/no-dynamic-require
-	if ("default" in fileExports === false) {
-		return failed("missing default export")
+	if (testExportName in fileExports === false) {
+		// it's allowed to omit the test export
+		return passed(createTest({}))
 	}
-	const defaultExport = fileExports.default
-	if (typeof defaultExport !== "function") {
-		return failed("file export default must be a function")
+	const testExport = fileExports[testExportName]
+	if (typeof testExport !== "function") {
+		return failed(`file ${testExportName} export must be a function`)
 	}
-	return passed(defaultExport)
+	return passed(testExport)
 }
 
 export const createPackageTest = ({ location = process.cwd() }) => params =>

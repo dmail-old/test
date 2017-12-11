@@ -1,4 +1,5 @@
 import { composeSequenceWithAllocatedMs, mutateAction } from "@dmail/action"
+import { passedIcon, failedIcon, passedColor, failedColor, endColor } from "./styles.js"
 
 const createExpectationsFromObject = expectationsObject =>
 	Object.keys(expectationsObject).map(description => {
@@ -24,19 +25,42 @@ export const createTest = expectationsObject => {
 		})
 
 	/* istanbul ignore next: internal usage, not meant to be used nor maintained */
-	runTest["@@autorun"] = () =>
+	runTest["@@autorun"] = filepath => {
+		const appendResult = (string, result) => {
+			if (result) {
+				return `${string}: ${result}`
+			}
+			return string
+		}
+
+		console.log(`autorun test file ${filepath}`)
 		runTest({
 			beforeEach: description => {
+				console.log("")
 				console.log(description)
 			},
 			afterEach: (description, result, passed) => {
 				if (passed) {
-					console.log(`passed${result ? `: ${result}` : ""}`)
+					console.log(appendResult(`${passedColor}${passedIcon} passed${endColor}`, result))
 				} else {
-					console.log(`failed${result ? `: ${result}` : ""}`)
+					console.log(appendResult(`${failedColor}${failedIcon} failed${endColor}`, result))
 				}
 			}
+		}).then(data => {
+			const failedCount = data.filter(({ state }) => state === "failed").length
+			const passedCount = data.filter(({ state }) => state === "passed").length
+			const passed = failedCount === 0
+
+			console.log("")
+			if (passed) {
+				console.log(`${passedColor}${passedIcon} ${passedCount} tests passed${endColor}`)
+			} else {
+				console.log(
+					`${failedColor}${failedIcon} ${failedCount} failed tests on ${data.length}${endColor}`
+				)
+			}
 		})
+	}
 
 	return runTest
 }

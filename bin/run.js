@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { createPackageTest } from "../index.js"
+import { passedIcon, failedIcon, passedColor, failedColor, endColor } from "../src/styles.js"
 
 const cwd = process.cwd()
 const log = (...args) => process.stdout.write(...args)
@@ -12,26 +13,31 @@ const test = createPackageTest({
 const createBeforeEachFileMessage = file => `test ${file}
 `
 const createBeforeEachTestMessage = description => `	${description}: `
-const createFailedTestMessage = () => `failed
-`
-const createPassedTestMessage = () => `passed
-`
-const createFailedFileMessage = () => `failed
 
+const createFailedTestMessage = () => `${failedColor}${failedIcon} failed${endColor}
 `
+
+const createPassedTestMessage = () => `${passedColor}${passedIcon} passed${endColor}
+`
+
+const createFailedFileMessage = report => {
+	const tests = Object.keys(report).map(key => report[key])
+	const failedCount = tests.filter(test => {
+		return test.state === "failed"
+	}).length
+	return `${failedColor}${failedIcon} ${failedCount} failed tests on ${tests.length}${endColor}
+`
+}
+
 const createPassedFileMessage = report => {
 	const testCount = Object.keys(report).length
-	return `passed (${testCount} tests)
+	return `${passedColor}${passedIcon} ${testCount} tests passed${endColor}
 
 `
 }
 const createPassedMessage = report => {
 	const fileCount = Object.keys(report).length
-	if (fileCount === 0) {
-		return `perfecto! (no files ^^')
-`
-	}
-	return `perfecto! (${fileCount} files)
+	return `${passedColor}${passedIcon} ${fileCount} files tested${endColor}
 `
 }
 
