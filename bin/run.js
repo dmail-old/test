@@ -7,12 +7,12 @@ const cwd = process.cwd()
 const log = (...args) => process.stdout.write(...args)
 const warn = (...args) => process.stdout.write(...args)
 const test = createPackageTest({
-	location: cwd
+	location: cwd,
 })
 
-const createBeforeEachFileMessage = file => `test ${file}
+const createBeforeEachFileMessage = (file) => `test ${file}
 `
-const createBeforeEachTestMessage = description => `	${description}: `
+const createBeforeEachTestMessage = (description) => `	${description}: `
 
 const createFailedTestMessage = () => `${failedColor}${failedIcon} failed${endColor}
 `
@@ -20,29 +20,51 @@ const createFailedTestMessage = () => `${failedColor}${failedIcon} failed${endCo
 const createPassedTestMessage = () => `${passedColor}${passedIcon} passed${endColor}
 `
 
-const createFailedFileMessage = report => {
-	const tests = Object.keys(report).map(key => report[key])
-	const failedCount = tests.filter(test => {
+const createFailedFileMessage = (report) => {
+	const tests = Object.keys(report).map((key) => report[key])
+	const failedCount = tests.filter((test) => {
 		return test.state === "failed"
 	}).length
 	return `${failedColor}${failedIcon} ${failedCount} failed tests on ${tests.length}${endColor}
 `
 }
 
-const createPassedFileMessage = report => {
+const createPassedFileMessage = (report) => {
 	const testCount = Object.keys(report).length
 	return `${passedColor}${passedIcon} ${testCount} tests passed${endColor}
 
 `
 }
-const createPassedMessage = report => {
+
+const createPassedMessage = (report) => {
 	const fileCount = Object.keys(report).length
 	return `${passedColor}${passedIcon} ${fileCount} files tested${endColor}
 `
 }
 
-const beforeEachFile = file => log(createBeforeEachFileMessage(file))
+const createFailedMessage = (report) => {
+	if (typeof report === "string") {
+		return `CRITICAL FAILURE: ${report}`
+	}
+
+	const fileCount = Object.keys(report).length
+	const failedFileCount = Object.keys(report)
+		.map((file) => report[file])
+		.filter((fileReport) => {
+			return Object.keys(fileReport)
+				.map((key) => report[key])
+				.some((testReport) => {
+					return testReport.state === "failed"
+				})
+		}).length
+	return `${failedColor}${failedIcon} ${failedFileCount} failed files on ${fileCount}${endColor}
+`
+}
+
+const beforeEachFile = (file) => log(createBeforeEachFileMessage(file))
+
 const beforeEachTest = (file, description) => log(createBeforeEachTestMessage(description))
+
 const afterEachTest = (file, description, report, passed) => {
 	if (passed) {
 		log(createPassedTestMessage())
@@ -50,6 +72,7 @@ const afterEachTest = (file, description, report, passed) => {
 		warn(createFailedTestMessage())
 	}
 }
+
 const afterEachFile = (file, report, passed) => {
 	if (passed) {
 		log(createPassedFileMessage(report))
@@ -57,11 +80,13 @@ const afterEachFile = (file, report, passed) => {
 		warn(createFailedFileMessage(report))
 	}
 }
+
 const afterAll = (report, passed) => {
 	if (passed) {
 		log(createPassedMessage(report))
 		process.exit(0)
 	} else {
+		log(createFailedMessage(report))
 		process.exit(1)
 	}
 }
@@ -70,5 +95,5 @@ test({
 	beforeEachFile,
 	beforeEachTest,
 	afterEachTest,
-	afterEachFile
-}).then(report => afterAll(report, true), report => afterAll(report, false))
+	afterEachFile,
+}).then((report) => afterAll(report, true), (report) => afterAll(report, false))

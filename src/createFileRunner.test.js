@@ -1,5 +1,5 @@
-import { composeFileTests } from "./createPackageTest.js"
-import { createTest } from "./createTest.js"
+import { createFileRunner } from "./createFileRunner.js"
+import { createTest } from "./createTestRunner.js"
 import { test } from "@dmail/test-cheap"
 import { createSpy } from "@dmail/spy"
 import assert from "assert"
@@ -18,15 +18,15 @@ test("createPackageTest.js", ({ ensure }) => {
 		const tests = {
 			[firstFile]: createTest({
 				[firstDesc]: ({ fail }) => fail(firstValue),
-				[secondDesc]: ({ pass }) => pass(secondValue)
+				[secondDesc]: ({ pass }) => pass(secondValue),
 			}),
 			[secondFile]: createTest({
-				[thirdDesc]: ({ pass }) => pass(thirdValue)
-			})
+				[thirdDesc]: ({ pass }) => pass(thirdValue),
+			}),
 		}
-		const test = composeFileTests({
+		const run = createFileRunner({
 			files: [firstFile, secondFile],
-			getFileTest: name => tests[name]
+			getFileTest: (name) => tests[name],
 		})
 
 		const beforeEachFile = createSpy("beforeEachFile")
@@ -34,11 +34,11 @@ test("createPackageTest.js", ({ ensure }) => {
 		const beforeEachTest = createSpy("beforeEachTest")
 		const afterEachTest = createSpy("afterEachTest")
 
-		test({
+		run({
 			beforeEachFile,
 			afterEachFile,
 			beforeEachTest,
-			afterEachTest
+			afterEachTest,
 		})
 
 		const beforeEachFileFirstCall = beforeEachFile.track(0)
@@ -58,7 +58,7 @@ test("createPackageTest.js", ({ ensure }) => {
 				assert(report.called, `${tracker} not called`)
 				assert(
 					previousTracker.createReport().absoluteOrder < report.absoluteOrder,
-					`${tracker} must be called before ${previousTracker}`
+					`${tracker} must be called before ${previousTracker}`,
 				)
 				return tracker
 			})
@@ -77,7 +77,7 @@ test("createPackageTest.js", ({ ensure }) => {
 			beforeEachFileSecondCall,
 			beforeEachTestThirdCall,
 			afterEachTestThirdCall,
-			afterEachFileSecondCall
+			afterEachFileSecondCall,
 		)
 
 		assertArgValues(beforeEachFileFirstCall, firstFile)
@@ -89,7 +89,7 @@ test("createPackageTest.js", ({ ensure }) => {
 			afterEachFileFirstCall,
 			firstFile,
 			[{ state: "failed", result: firstValue }, { state: "passed", result: secondValue }],
-			false
+			false,
 		)
 		assertArgValues(beforeEachFileSecondCall, secondFile)
 		assertArgValues(beforeEachTestThirdCall, secondFile, thirdDesc)
@@ -98,7 +98,7 @@ test("createPackageTest.js", ({ ensure }) => {
 			afterEachFileSecondCall,
 			secondFile,
 			[{ state: "passed", result: thirdValue }],
-			true
+			true,
 		)
 	})
 
@@ -109,19 +109,19 @@ test("createPackageTest.js", ({ ensure }) => {
 		const secondExpectationSpy = createSpy()
 		const tests = {
 			a: createTest({
-				descA: firstExpectationSpy
+				descA: firstExpectationSpy,
 			}),
 			b: createTest({
-				descB: secondExpectationSpy
-			})
+				descB: secondExpectationSpy,
+			}),
 		}
-		const test = composeFileTests({
+		const run = createFileRunner({
 			files: ["a", "b"],
-			getFileTest: name => tests[name]
+			getFileTest: (name) => tests[name],
 		})
 
-		test({
-			allocatedMs: 100
+		run({
+			allocatedMs: 100,
 		})
 
 		const firstExpectationCall = firstExpectationSpy.track(0)
@@ -145,19 +145,19 @@ test("createPackageTest.js", ({ ensure }) => {
 		const secondExpectationSpy = createSpy()
 		const tests = {
 			a: createTest({
-				descA: firstExpectationSpy
+				descA: firstExpectationSpy,
 			}),
 			b: createTest({
-				descB: secondExpectationSpy
-			})
+				descB: secondExpectationSpy,
+			}),
 		}
-		const test = composeFileTests({
+		const run = createFileRunner({
 			files: ["a", "b"],
-			getFileTest: name => tests[name]
+			getFileTest: (name) => tests[name],
 		})
 
-		const action = test({
-			allocatedMs: 100
+		const action = run({
+			allocatedMs: 100,
 		})
 
 		clock.tick(100)
