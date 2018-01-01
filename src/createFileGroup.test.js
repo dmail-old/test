@@ -1,5 +1,5 @@
-import { createFileRunner } from "./createFileRunner.js"
-import { createTest } from "./createTestRunner.js"
+import { createFileSuite } from "./createFileSuite.js"
+import { test as createTest } from "./createTest.js"
 import { test } from "@dmail/test-cheap"
 import { createSpy } from "@dmail/spy"
 import assert from "assert"
@@ -15,18 +15,18 @@ test("createPackageTest.js", ({ ensure }) => {
 		const firstDesc = "desc-1"
 		const secondDesc = "desc-2"
 		const thirdDesc = "desc-3"
-		const tests = {
-			[firstFile]: createTest({
+		const tests = [
+			createTest({
 				[firstDesc]: ({ fail }) => fail(firstValue),
 				[secondDesc]: ({ pass }) => pass(secondValue),
 			}),
-			[secondFile]: createTest({
+			createTest({
 				[thirdDesc]: ({ pass }) => pass(thirdValue),
 			}),
-		}
-		const run = createFileRunner({
+		]
+		const { run } = createFileSuite({
 			files: [firstFile, secondFile],
-			getFileTest: (name) => tests[name],
+			getFileTest: (name, index) => tests[index],
 		})
 
 		const beforeEachFile = createSpy("beforeEachFile")
@@ -102,58 +102,44 @@ test("createPackageTest.js", ({ ensure }) => {
 		)
 	})
 
-	ensure("each expectation is given appropriate allocatedMs", () => {
+	ensure("each test is given appropriate allocatedMs", () => {
 		const clock = install()
 
-		const firstExpectationSpy = createSpy()
-		const secondExpectationSpy = createSpy()
-		const tests = {
-			a: createTest({
-				descA: firstExpectationSpy,
-			}),
-			b: createTest({
-				descB: secondExpectationSpy,
-			}),
-		}
-		const run = createFileRunner({
+		const firstTestSpy = createSpy()
+		const secondTestSpy = createSpy()
+		const tests = [createTest("a", firstTestSpy), createTest("b", secondTestSpy)]
+		const { run } = createFileSuite({
 			files: ["a", "b"],
-			getFileTest: (name) => tests[name],
+			getFileSuite: (name, index) => tests[index],
 		})
 
 		run({
 			allocatedMs: 100,
 		})
 
-		const firstExpectationCall = firstExpectationSpy.track(0)
-		const firstExpectationAction = firstExpectationCall.createReport().argValues[0]
+		const firstCall = firstTestSpy.track(0)
+		const firstAction = firstCall.createReport().argValues[0]
 
-		assert.equal(firstExpectationAction.getRemainingMs(), 100)
+		assert.equal(firstAction.getRemainingMs(), 100)
 		clock.tick(10)
-		firstExpectationAction.pass()
+		firstAction.pass()
 
-		const secondExpectationCall = secondExpectationSpy.track(0)
-		const secondExpectationAction = secondExpectationCall.createReport().argValues[0]
+		const secondCall = secondTestSpy.track(0)
+		const secondAction = secondCall.createReport().argValues[0]
 
-		assert.equal(secondExpectationAction.getRemainingMs(), 90)
+		assert.equal(secondAction.getRemainingMs(), 90)
 
 		clock.uninstall()
 	})
 
 	ensure("when an expectation runs out of ms, all test fails", () => {
 		const clock = install()
-		const firstExpectationSpy = createSpy()
-		const secondExpectationSpy = createSpy()
-		const tests = {
-			a: createTest({
-				descA: firstExpectationSpy,
-			}),
-			b: createTest({
-				descB: secondExpectationSpy,
-			}),
-		}
-		const run = createFileRunner({
+		const firstTestSpy = createSpy()
+		const secondTestSpy = createSpy()
+		const tests = [createTest("a", firstTestSpy), createTest("b", secondTestSpy)]
+		const { run } = createFileSuite({
 			files: ["a", "b"],
-			getFileTest: (name) => tests[name],
+			getFileTest: (name, index) => tests[index],
 		})
 
 		const action = run({
@@ -163,7 +149,7 @@ test("createPackageTest.js", ({ ensure }) => {
 		clock.tick(100)
 		assert.equal(action.getState(), "failed")
 		assert.equal(action.getResult(), "must pass or fail in less than 100ms")
-		assert.equal(secondExpectationSpy.track(0).createReport().called, false)
+		assert.equal(secondTestSpy.track(0).createReport().called, false)
 
 		clock.uninstall()
 	})

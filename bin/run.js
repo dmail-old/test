@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
-import { createPackageTest } from "../index.js"
+import { createFileGroup } from "../src/createFileGroup.js"
 import { passedIcon, failedIcon, passedColor, failedColor, endColor } from "../src/styles.js"
 
 const cwd = process.cwd()
 const log = (...args) => process.stdout.write(...args)
 const warn = (...args) => process.stdout.write(...args)
-const test = createPackageTest({
+const { run } = createFileGroup({
 	location: cwd,
 })
 
@@ -81,7 +81,7 @@ const afterEachFile = (file, report, passed) => {
 	}
 }
 
-const afterAll = (report, passed) => {
+const after = (report, passed) => {
 	if (passed) {
 		log(createPassedMessage(report))
 		process.exit(0)
@@ -91,9 +91,10 @@ const afterAll = (report, passed) => {
 	}
 }
 
-test({
+run({
 	beforeEachFile,
 	beforeEachTest,
 	afterEachTest,
 	afterEachFile,
-}).then((report) => afterAll(report, true), (report) => afterAll(report, false))
+	after,
+})
