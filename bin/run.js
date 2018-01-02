@@ -1,18 +1,18 @@
 #!/usr/bin/env node
 
-import { createFileGroup } from "../src/createFileGroup.js"
+import nodepath from "path"
+import { passed, chainFunctions } from "@dmail/action"
+import { findSourceFiles, findFilesForTest } from "../src/findFiles.js"
 import { passedIcon, failedIcon, passedColor, failedColor, endColor } from "../src/styles.js"
+import { createStep } from "../src/createStep.js"
+import { runAllTests } from "../src/runAllTests.js"
 
-const cwd = process.cwd()
 const log = (...args) => process.stdout.write(...args)
 const warn = (...args) => process.stdout.write(...args)
-const { run } = createFileGroup({
-	location: cwd,
-})
 
-const createBeforeEachFileMessage = (file) => `test ${file}
+const createBeforeEachFileMessage = ({ file }) => `test ${file}
 `
-const createBeforeEachTestMessage = (description) => `	${description}: `
+const createBeforeEachTestMessage = ({ description }) => `	${description}: `
 
 const createFailedTestMessage = () => `${failedColor}${failedIcon} failed${endColor}
 `
@@ -20,24 +20,21 @@ const createFailedTestMessage = () => `${failedColor}${failedIcon} failed${endCo
 const createPassedTestMessage = () => `${passedColor}${passedIcon} passed${endColor}
 `
 
-const createFailedFileMessage = (report) => {
-	const tests = Object.keys(report).map((key) => report[key])
-	const failedCount = tests.filter((test) => {
-		return test.state === "failed"
-	}).length
+const createFailedFileMessage = ({ value: tests }) => {
+	const failedCount = tests.filter((test) => test.state === "failed").length
 	return `${failedColor}${failedIcon} ${failedCount} failed tests on ${tests.length}${endColor}
 `
 }
 
-const createPassedFileMessage = (report) => {
-	const testCount = Object.keys(report).length
+const createPassedFileMessage = ({ value: tests }) => {
+	const testCount = tests.length
 	return `${passedColor}${passedIcon} ${testCount} tests passed${endColor}
 
 `
 }
 
-const createPassedMessage = (report) => {
-	const fileCount = Object.keys(report).length
+const createPassedMessage = ({ value }) => {
+	const fileCount = value.length
 	return `${passedColor}${passedIcon} ${fileCount} files tested${endColor}
 `
 }
@@ -61,23 +58,23 @@ const createFailedMessage = (report) => {
 `
 }
 
-const beforeEachFile = (file) => log(createBeforeEachFileMessage(file))
+const beforeEachFile = ({ file }) => log(createBeforeEachFileMessage(file))
 
-const beforeEachTest = (file, description) => log(createBeforeEachTestMessage(description))
+const beforeEachTest = ({ description }) => log(createBeforeEachTestMessage(description))
 
-const afterEachTest = (file, description, report, passed) => {
-	if (passed) {
+const afterEachTest = ({ state }) => {
+	if (state === "passed") {
 		log(createPassedTestMessage())
 	} else {
 		warn(createFailedTestMessage())
 	}
 }
 
-const afterEachFile = (file, report, passed) => {
-	if (passed) {
-		log(createPassedFileMessage(report))
+const afterEachFile = ({ value, state }) => {
+	if (state === "passed") {
+		log(createPassedFileMessage(value))
 	} else {
-		warn(createFailedFileMessage(report))
+		warn(createFailedFileMessage(value))
 	}
 }
 
@@ -91,10 +88,65 @@ const after = (report, passed) => {
 	}
 }
 
-run({
-	beforeEachFile,
-	beforeEachTest,
-	afterEachTest,
-	afterEachFile,
+const requireAllSourceFiles = (location) => {
+	return findSourceFiles(location).then((sourceFiles) =>
+		sourceFiles.forEach((sourceFile) => {
+			const sourcePath = nodepath.resolve(location, sourceFile)
+			require(sourcePath) // eslint-disable-line import/no-dynamic-require
+		}),
+	)
+}
+
+const exportName = "unit"
+const getExportedTest = (location) => {
+	const fileExports = require(location) // eslint-disable-line import/no-dynamic-require
+	if (exportName in fileExports === false) {
+		// it's allowed to omit the export
+		return passed(null)
+	}
+	const exportedValue = fileExports[exportName]
+	// if (typeof export !== "function") {
+	// 	return failed(`file ${exportName} export must be a suite`)
+	// }
+	return passed(exportedValue)
+}
+
+const cwd = process.cwd()
+const step = createStep({
+	description: "stuff",
+	fn: ({ allocatedMs }) => {
+		return chainFunctions(
+			// we require source files so that code coverage know their existence and can report
+			// their coverage (in case no test cover them they still appear in the report)@
+			() => requireAllSourceFiles(cwd),
+			() => findFilesForTest(cwd),
+			(files) => {
+				const filePlans = files
+					.map((file) => getExportedTest(nodepath.resolve(cwd, file)))
+					// filter file without export
+					.filter((test) => test !== null)
+
+				return runAllTests({
+					tests: filePlans,
+					allocatedMs,
+					exec: (filePlan) => {
+						return filePlan.run({
+							before: beforeEachFile,
+							after: afterEachFile,
+							beforeEach: beforeEachTest,
+							afterEach: afterEachTest,
+						})
+					},
+				})
+			},
+		)
+	},
+})
+
+step.run({
 	after,
+	// searching tests files & requiring does not consume any allocatedMs
+	// only test execution consume them
+	// here we force all tests to be over in less than 1s
+	allocatedMs: 1000,
 })
