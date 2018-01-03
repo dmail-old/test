@@ -5,3 +5,17 @@
 [![codecov](https://codecov.io/gh/dmail/test/branch/master/graph/badge.svg)](https://codecov.io/gh/dmail/test)
 
 Nodejs test runner
+
+```javascript
+import { scenario } from "@dmail/scenario"
+
+export const unit = scenario("feature", ({ test, plan }) => {
+	plan("subfeature", () => {
+		test("foo", () => {})
+
+		plan("other plan", () => {
+			test("bar", () => {})
+		})
+	})
+})
+```

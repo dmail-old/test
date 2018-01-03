@@ -1,8 +1,13 @@
-import { createTemplate } from "./createTemplate.js"
+import { createTemplate, compileOne } from "./createTemplate.js"
 
 export const createTest = ({ description, fn }) => {
 	return createTemplate({
 		description,
-		implementation: fn,
+		parse: (tpl) => {
+			return {
+				parsed: tpl,
+				compile: (param) => compileOne(tpl, { compiler: fn, ...param }),
+			}
+		},
 	})
 }

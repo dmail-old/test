@@ -1,7 +1,5 @@
-import { createTemplate } from "./createTemplate.js"
+import { createTemplate, compileMany } from "./createTemplate.js"
 import { createTest } from "./createTest.js"
-import { runAllTests } from "./runAllTests.js"
-
 import {
 	forcedIcon,
 	passedIcon,
@@ -72,7 +70,7 @@ export const autoRunPlan = (plan) => {
 		console.log(`autorun ${description}`)
 	}
 
-	return plan.run({
+	return plan.execute({
 		before,
 		beforeEach,
 		afterEach,
@@ -83,7 +81,7 @@ export const autoRunPlan = (plan) => {
 export const createPlan = (description, fn) => {
 	return createTemplate({
 		description,
-		implementation: ({ allocatedMs, beforeEach, afterEach }) => {
+		parse: () => {
 			const rawTests = []
 			const collectTests = ({ description, fn, forced = false, skipped = false }) => {
 				const createLocalTest = ({ description: testDescription, fn: testFn }) => {
@@ -139,13 +137,10 @@ export const createPlan = (description, fn) => {
 				return test
 			})
 
-			return runAllTests({
-				tests,
-				allocatedMs,
-				run: (test) => {
-					return test.run({ before: beforeEach, after: afterEach })
-				},
-			})
+			return {
+				parsed: tests,
+				compile: (param) => compileMany(tests, param),
+			}
 		},
 	})
 }

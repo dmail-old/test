@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 
 import nodepath from "path"
-import { passed, chainFunctions } from "@dmail/action"
+import { passed, chainFunctions, sequence } from "@dmail/action"
 import { findSourceFiles, findFilesForTest } from "../src/findFiles.js"
 import { passedIcon, failedIcon, passedColor, failedColor, endColor } from "../src/styles.js"
-import { createStep } from "../src/createStep.js"
-import { runAllTests } from "../src/runAllTests.js"
+import { createTemplate, compileMany } from "../src/createTemplate.js"
 
 const log = (...args) => process.stdout.write(...args)
 const warn = (...args) => process.stdout.write(...args)
@@ -112,38 +111,47 @@ const getExportedTest = (location) => {
 }
 
 const cwd = process.cwd()
-const step = createStep({
+const tpl = createTemplate({
 	description: "stuff",
-	fn: ({ allocatedMs }) => {
+	parse: () => {
 		return chainFunctions(
 			// we require source files so that code coverage know their existence and can report
 			// their coverage (in case no test cover them they still appear in the report)@
 			() => requireAllSourceFiles(cwd),
 			() => findFilesForTest(cwd),
 			(files) => {
-				const filePlans = files
+				const fileScenarios = files
 					.map((file) => getExportedTest(nodepath.resolve(cwd, file)))
 					// filter file without export
 					.filter((test) => test !== null)
 
-				return runAllTests({
-					tests: filePlans,
-					allocatedMs,
-					exec: (filePlan) => {
-						return filePlan.run({
-							before: beforeEachFile,
-							after: afterEachFile,
-							beforeEach: beforeEachTest,
-							afterEach: afterEachTest,
-						})
-					},
+				return sequence(fileScenarios, (fileScenario) => {
+					return fileScenario.parse()
+				}).then((parsedFileScenarios) => {
+					return {
+						parsed: parsedFileScenarios,
+						compile: (params) => {
+							return compileMany(parsedFileScenarios, {
+								beforeEach: beforeEachFile,
+								afterEach: afterEachFile,
+								compiler: (parsedFileScenario) => {
+									return compileMany(parsedFileScenario, {
+										beforeEach: beforeEachTest,
+										afterEach: afterEachTest,
+										...params,
+									})
+								},
+								...params,
+							})
+						},
+					}
 				})
 			},
 		)
 	},
 })
 
-step.run({
+tpl.execute({
 	after,
 	// searching tests files & requiring does not consume any allocatedMs
 	// only test execution consume them
