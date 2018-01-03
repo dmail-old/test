@@ -1,17 +1,23 @@
 ```javascript
-import { createTestRunner, test } from "@dmail/test"
-import { aFunctionWhich, whenCalledWith, willReturnWith } from "@dmail/expect"
-import { passed } from "@dmail/action"
+import { scenario } from "@dmail/test"
 
-export const run = createTestRunner(
-	test("always pass", () => passed()),
-	test("call with null", () => {
-		return aFunctionWhich(whenCalledWith(null), willReturnWith(null))(fn)
-	}),
-	test("call with undefined", () => {
-		return aFunctionWhich(whenCalledWith(undefined), willReturnWith(undefined))(fn)
-	}),
-	test.force("only me because debugging this one", () => {}),
-	test.force("and me too please", () => {}),
-)
+export const template = scenario.force("feature a", ({ test, plan }) => {
+	test("foo")
+
+	plan("nested plan", () => {
+		plan.force("further nested plan", () => {
+			test.force("zzz", () => {})
+
+			test.skip("stuff", () => {})
+		})
+	})
+
+	test("bat", () => {})
+
+	test("bar", () => {})
+})
 ```
+
+* test.force, plan.force, scenario.force, means all other non forced test/plan/scenario must be skipped
+* skip will prevent test/plan/scenario from being runned, (anything inside as well)
+* scenario must be discoverable: we can access tests count, skipped count, forced count
