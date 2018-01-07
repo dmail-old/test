@@ -1,12 +1,12 @@
 ```javascript
-import { scenario } from "@dmail/test"
+import { plan } from "@dmail/test"
 
-export const template = scenario.force("feature a", ({ test, plan }) => {
+export const template = plan.focus("feature a", ({ test, scenario }) => {
 	test("foo")
 
-	plan("nested plan", () => {
-		plan.force("further nested plan", () => {
-			test.force("zzz", () => {})
+	scenario("nested plan", () => {
+		scenario.focus("further nested plan", () => {
+			test.focus("zzz", () => {})
 
 			test.skip("stuff", () => {})
 		})
