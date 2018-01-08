@@ -7,13 +7,13 @@
 Nodejs test runner
 
 ```javascript
-import { scenario } from "@dmail/scenario"
+import { plan } from "@dmail/test"
 
-export const unit = scenario("feature", ({ test, plan }) => {
-	plan("subfeature", () => {
+export const test = plan("feature", ({ test, scenario }) => {
+	scenario("subfeature", () => {
 		test("foo", () => {})
 
-		plan("other plan", () => {
+		scenario("other plan", () => {
 			test("bar", () => {})
 		})
 	})

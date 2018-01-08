@@ -7,6 +7,8 @@ import {
 	passedColor,
 	failedColor,
 	skippedColor,
+	expiredIcon,
+	expiredColor,
 	endColor,
 } from "./styles.js"
 
@@ -33,9 +35,11 @@ export const autoExecute = (tests, { allocatedMs } = {}) => {
 		console.log(forced ? `${forcedIcon} ${description}` : description)
 	}
 
-	const onEnd = ({ skipped, passed, value }) => {
+	const onEnd = ({ skipped, passed, expired, value }) => {
 		if (skipped) {
 			console.log(appendResult(`${skippedColor}${skippedIcon} skipped${endColor}`, value))
+		} else if (expired) {
+			console.log(appendResult(`${expiredColor}${expiredIcon} expired${endColor}`, value))
 		} else if (passed) {
 			console.log(appendResult(`${passedColor}${passedIcon} passed${endColor}`, value))
 		} else {
@@ -44,11 +48,6 @@ export const autoExecute = (tests, { allocatedMs } = {}) => {
 	}
 
 	const after = (data) => {
-		if (typeof data === "string") {
-			console.log(`CRITICAL FAILURE: ${data}`)
-			return
-		}
-
 		const testResults = data
 		const testCount = testResults.length
 		const skippedCount = testResults.filter(({ skipped }) => skipped).length

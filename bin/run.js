@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import nodepath from "path"
-import { passed, chainFunctions } from "@dmail/action"
+import { passed, failed, chainFunctions, sequence } from "@dmail/action"
 import { findSourceFiles, findFilesForTest } from "../src/findFiles.js"
 import { autoExecute } from "../src/autoExecute.js"
 import { collect } from "../src/plan.js"
@@ -15,7 +15,7 @@ const requireAllSourceFiles = (location) => {
 	)
 }
 
-const exportName = "testPlan"
+const exportName = "test"
 const getExportedPlan = (location) => {
 	const fileExports = require(location) // eslint-disable-line import/no-dynamic-require
 	if (exportName in fileExports === false) {
@@ -23,9 +23,9 @@ const getExportedPlan = (location) => {
 		return passed(null)
 	}
 	const exportedValue = fileExports[exportName]
-	// if (typeof export !== "function") {
-	// 	return failed(`file ${exportName} export must be a suite`)
-	// }
+	if (typeof exportedValue !== "object" || typeof exportedValue.createRootScenario !== "function") {
+		return failed(`file ${exportName} export must be a plan`)
+	}
 	return passed(exportedValue)
 }
 
@@ -38,12 +38,14 @@ chainFunctions(
 	// instead of requiring them manually
 	() => requireAllSourceFiles(cwd),
 	() => findFilesForTest(cwd),
-	(files) => {
-		const filePlans = files
-			.map((file) => getExportedPlan(nodepath.resolve(cwd, file)))
-			// filter file without export
-			.filter((plan) => plan !== null)
-
-		return autoExecute(collect(...filePlans), { allocatedMs: 1000 })
+	(files) => sequence(files, (file) => getExportedPlan(nodepath.resolve(cwd, file))),
+	(plans) => plans.filter((plan) => plan !== null),
+	(plans) => collect(...plans),
+).then(
+	(tests) =>
+		autoExecute(tests, { allocatedMs: 100 }).then(() => process.exit(0), () => process.exit(1)),
+	(failure) => {
+		console.log(failure)
+		process.exit(1)
 	},
-).then(() => process.exit(0), () => process.exit(1))
+)
