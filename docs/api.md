@@ -1,20 +1,28 @@
 ```javascript
 import { plan } from "@dmail/test"
 
+const fn = (value) => {
+	return {
+		value
+	}
+}
+
 export const template = plan.focus("feature a", ({ test, scenario }) => {
-	test("foo")
+	scenario(() => {
+		const input = 10
+		const output = fn(10)
+		return {input, output}
+	}), () => {
+		test(({input}) => input === 10, "input must be 10")
 
-	scenario("nested plan", () => {
-		scenario.focus("further nested plan", () => {
-			test.focus("zzz", () => {})
+		test(({output}) => output.hasOwnProperty('value'), "output must have a value property")
 
-			test.skip("stuff", () => {})
+		scenario(({output}) => {
+			return output.value
+		}, () => {
+			test((value) => value === 10)
 		})
 	})
-
-	test("bat", () => {})
-
-	test("bar", () => {})
 })
 ```
 
