@@ -6,13 +6,17 @@ test("plan", ({ ensure }) => {
 	ensure("collect and longDescriptions", () => {
 		const testPlan = plan("yo", ({ test, scenario }) => {
 			test("testA", () => {})
+
 			scenario("scenarioA", () => {
 				test("testB", () => {})
+
 				scenario("scenarioAA", () => {
 					test("testC", () => {})
 				})
+
 				test("testD", () => {})
 			})
+
 			test("testE", () => {})
 		})
 		const tests = collect(testPlan)
@@ -34,9 +38,11 @@ test("plan", ({ ensure }) => {
 					test("d")
 				})
 			})
+
 			scenario.focus("yyy", () => {
 				test("b")
 			})
+
 			scenario("zzz", () => {
 				test("c")
 			})

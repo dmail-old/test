@@ -1,4 +1,59 @@
 import { pure, mixin } from "@dmail/mixin"
+import { autoExecute } from "./autoExecute.js"
+
+export const collect = (...plans) => {
+	let someTestIsFocused = false
+	const tests = []
+	const somePlanIsFocused = plans.some((plan) => plan.isFocused())
+
+	const visit = (scenario, { focused, parentScenarios }) => {
+		const ownTests = scenario.getTests()
+		if (someTestIsFocused === false) {
+			const someOwnTestIsFocused = ownTests.some(({ isFocused }) => isFocused())
+			if (someOwnTestIsFocused) {
+				someTestIsFocused = true
+			}
+		}
+
+		ownTests.forEach((ownTest) => {
+			if (ownTest.isFocused() === false && scenario.isFocused() === false && focused) {
+				ownTest.skip()
+			}
+			ownTest.setScenarios(parentScenarios)
+			tests.push(ownTest)
+		})
+
+		const ownScenarios = scenario.getScenarios()
+		if (focused === false) {
+			const someOwnScenarioIsFocused = ownScenarios.some(({ isFocused }) => isFocused())
+			if (someOwnScenarioIsFocused) {
+				focused = true
+			}
+		}
+
+		ownScenarios.forEach((ownScenario) =>
+			visit(ownScenario, { focused, parentScenarios: [ownScenario, ...parentScenarios] }),
+		)
+	}
+
+	plans.forEach((plan) => {
+		const rootScenario = plan.createRootScenario()
+		visit(rootScenario, {
+			focused: somePlanIsFocused,
+			parentScenarios: [rootScenario],
+		})
+	})
+
+	if (someTestIsFocused) {
+		tests.forEach(({ isFocused, skip }) => {
+			if (isFocused() === false) {
+				skip()
+			}
+		})
+	}
+
+	return tests
+}
 
 const focusable = () => {
 	let focused = false
@@ -62,8 +117,8 @@ const createScenario = ({ description, fn }) => {
 }
 
 const createPlan = ({ description, fn }) => {
-	return mixin(pure, focusable, skippable, ({ isFocused, isSkipped }) => {
-		const collect = () => {
+	return mixin(pure, focusable, skippable, ({ isFocused, isSkipped, getLastComposite }) => {
+		const createRootScenario = () => {
 			const tests = []
 			const discoverTest = (description, fn) => {
 				const test = createTest({
@@ -134,7 +189,9 @@ const createPlan = ({ description, fn }) => {
 			return rootScenario
 		}
 
-		return { description, collect }
+		const autorun = () => autoExecute(collect(getLastComposite()), { allocatedMs: 100 })
+
+		return { description, createRootScenario, ["@@autorun"]: autorun }
 	})
 }
 
@@ -151,57 +208,3 @@ plan.skip = (description, fn) => {
 }
 
 export { plan }
-
-export const collect = (...plans) => {
-	let someTestIsFocused = false
-	const tests = []
-	const somePlanIsFocused = plans.some((plan) => plan.isFocused())
-
-	const visit = (scenario, { focused, parentScenarios }) => {
-		const ownTests = scenario.getTests()
-		if (someTestIsFocused === false) {
-			const someOwnTestIsFocused = ownTests.some(({ isFocused }) => isFocused())
-			if (someOwnTestIsFocused) {
-				someTestIsFocused = true
-			}
-		}
-
-		ownTests.forEach((ownTest) => {
-			if (ownTest.isFocused() === false && scenario.isFocused() === false && focused) {
-				ownTest.skip()
-			}
-			ownTest.setScenarios(parentScenarios)
-			tests.push(ownTest)
-		})
-
-		const ownScenarios = scenario.getScenarios()
-		if (focused === false) {
-			const someOwnScenarioIsFocused = ownScenarios.some(({ isFocused }) => isFocused())
-			if (someOwnScenarioIsFocused) {
-				focused = true
-			}
-		}
-
-		ownScenarios.forEach((ownScenario) =>
-			visit(ownScenario, { focused, parentScenarios: [ownScenario, ...parentScenarios] }),
-		)
-	}
-
-	plans.forEach((plan) => {
-		const rootScenario = plan.collect()
-		visit(rootScenario, {
-			focused: somePlanIsFocused,
-			parentScenarios: [rootScenario],
-		})
-	})
-
-	if (someTestIsFocused) {
-		tests.forEach(({ isFocused, skip }) => {
-			if (isFocused() === false) {
-				skip()
-			}
-		})
-	}
-
-	return tests
-}
