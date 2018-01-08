@@ -16,15 +16,15 @@ test("findFiles.js", ({ waitUntil }) => {
 			"file.test.js.map": "",
 			feature: {
 				"feature.js": "",
-				"feature.test.js": ""
-			}
-		}
+				"feature.test.js": "",
+			},
+		},
 	}
 
 	Promise.resolve()
 		.then(() => {
 			mock(abstractFileSystem)
-			return findSourceFiles().then(files => {
+			return findSourceFiles().then((files) => {
 				// test files should not be there but that's not a blocker
 				// so for now let's assert something that should not happen
 				// because I don't want to fix
@@ -35,15 +35,15 @@ test("findFiles.js", ({ waitUntil }) => {
 						"dist/file.js",
 						"dist/file.test.js",
 						"dist/feature/feature.js",
-						"dist/feature/feature.test.js"
-					].sort()
+						"dist/feature/feature.test.js",
+					].sort(),
 				)
 				mock.restore()
 			})
 		})
 		.then(() => {
 			mock(abstractFileSystem)
-			return findFilesForTest().then(files => {
+			return findFilesForTest().then((files) => {
 				assert.deepEqual(files.sort(), ["dist/feature/feature.test.js", "dist/file.test.js"].sort())
 				mock.restore()
 			})

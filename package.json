@@ -57,7 +57,7 @@
 		"code-lint": "eslint .",
 		"code-format": "prettiest",
 		"code-list": "prettiest-list",
-		"test-before": "npm run code-lint && npm run code-format && npm run code-compile",
+		"test-before": "npm run code-clean && npm run code-lint && npm run code-format && npm run code-compile",
 		"test-run": "test-run",
 		"test": "npm run test-before && npm run test-run",
 		"test-cover": "npm run test-before && nyc npm run test-run",
