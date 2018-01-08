@@ -1,3 +1,9 @@
+// https://github.com/kaelzhang/node-ignore
+// https://github.com/kaelzhang/node-glob-gitignore
+// https://karma-runner.github.io/latest/config/plugins.html
+// https://karma-runner.github.io/latest/dev/plugins.html
+// https://www.npmjs.com/package/glob#options
+
 import fs from "fs"
 import nodepath from "path"
 import { glob } from "glob-gitignore"
@@ -17,33 +23,33 @@ export const findSourceFiles = (location = process.cwd()) => {
 		glob(sourceFileInclude, {
 			nodir: true,
 			cwd: absoluteLocation,
-			ignore: sourceFileExclude
-		})
+			ignore: sourceFileExclude,
+		}),
 	)
 }
 
 const getOptionalFileContent = fromNodeCallbackCatching(
 	fs.readFile,
-	error => error.code === "ENOENT",
-	""
+	(error) => error.code === "ENOENT",
+	"",
 )
-const getOptionalFileContentAsString = path => getOptionalFileContent(path).then(String)
+const getOptionalFileContentAsString = (path) => getOptionalFileContent(path).then(String)
 
 export const findFilesForTest = (location = process.cwd()) => {
 	const absoluteLocation = nodepath.resolve(process.cwd(), location)
 	return getOptionalFileContentAsString(nodepath.join(absoluteLocation, ".testignore"))
-		.then(ignoreRules =>
+		.then((ignoreRules) =>
 			ignore()
 				.add(testFileExclude)
-				.add(ignoreRules)
+				.add(ignoreRules),
 		)
-		.then(ignore =>
+		.then((ignore) =>
 			fromPromise(
 				glob(testFileInclude, {
 					nodir: true,
 					cwd: absoluteLocation,
-					ignore: ignore._rules.map(({ origin }) => origin)
-				})
-			)
+					ignore: ignore._rules.map(({ origin }) => origin),
+				}),
+			),
 		)
 }

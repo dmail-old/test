@@ -1,74 +1,51 @@
 #!/usr/bin/env node
 
-import { createPackageTest } from "../index.js"
-import { passedIcon, failedIcon, passedColor, failedColor, endColor } from "../src/styles.js"
+import nodepath from "path"
+import { passed, failed, chainFunctions, sequence } from "@dmail/action"
+import { findSourceFiles, findFilesForTest } from "../src/findFiles.js"
+import { autoExecute } from "../src/autoExecute.js"
+import { collect } from "../src/plan.js"
+
+const requireAllSourceFiles = (location) => {
+	return findSourceFiles(location).then((sourceFiles) =>
+		sourceFiles.forEach((sourceFile) => {
+			const sourcePath = nodepath.resolve(location, sourceFile)
+			require(sourcePath) // eslint-disable-line import/no-dynamic-require
+		}),
+	)
+}
+
+const exportName = "test"
+const getExportedPlan = (location) => {
+	const fileExports = require(location) // eslint-disable-line import/no-dynamic-require
+	if (exportName in fileExports === false) {
+		// it's allowed to omit the export
+		return passed(null)
+	}
+	const exportedValue = fileExports[exportName]
+	if (typeof exportedValue !== "object" || typeof exportedValue.createRootScenario !== "function") {
+		return failed(`file ${exportName} export must be a plan`)
+	}
+	return passed(exportedValue)
+}
 
 const cwd = process.cwd()
-const log = (...args) => process.stdout.write(...args)
-const warn = (...args) => process.stdout.write(...args)
-const test = createPackageTest({
-	location: cwd
-})
 
-const createBeforeEachFileMessage = file => `test ${file}
-`
-const createBeforeEachTestMessage = description => `	${description}: `
-
-const createFailedTestMessage = () => `${failedColor}${failedIcon} failed${endColor}
-`
-
-const createPassedTestMessage = () => `${passedColor}${passedIcon} passed${endColor}
-`
-
-const createFailedFileMessage = report => {
-	const tests = Object.keys(report).map(key => report[key])
-	const failedCount = tests.filter(test => {
-		return test.state === "failed"
-	}).length
-	return `${failedColor}${failedIcon} ${failedCount} failed tests on ${tests.length}${endColor}
-`
-}
-
-const createPassedFileMessage = report => {
-	const testCount = Object.keys(report).length
-	return `${passedColor}${passedIcon} ${testCount} tests passed${endColor}
-
-`
-}
-const createPassedMessage = report => {
-	const fileCount = Object.keys(report).length
-	return `${passedColor}${passedIcon} ${fileCount} files tested${endColor}
-`
-}
-
-const beforeEachFile = file => log(createBeforeEachFileMessage(file))
-const beforeEachTest = (file, description) => log(createBeforeEachTestMessage(description))
-const afterEachTest = (file, description, report, passed) => {
-	if (passed) {
-		log(createPassedTestMessage())
-	} else {
-		warn(createFailedTestMessage())
-	}
-}
-const afterEachFile = (file, report, passed) => {
-	if (passed) {
-		log(createPassedFileMessage(report))
-	} else {
-		warn(createFailedFileMessage(report))
-	}
-}
-const afterAll = (report, passed) => {
-	if (passed) {
-		log(createPassedMessage(report))
-		process.exit(0)
-	} else {
+chainFunctions(
+	// we require source files so that code coverage know their existence and can report
+	// their coverage (in case no test cover them they still appear in the report)
+	// this is a hack, a better solution would just mark them as "must be covered"
+	// instead of requiring them manually
+	() => requireAllSourceFiles(cwd),
+	() => findFilesForTest(cwd),
+	(files) => sequence(files, (file) => getExportedPlan(nodepath.resolve(cwd, file))),
+	(plans) => plans.filter((plan) => plan !== null),
+	(plans) => collect(...plans),
+).then(
+	(tests) =>
+		autoExecute(tests, { allocatedMs: 100 }).then(() => process.exit(0), () => process.exit(1)),
+	(failure) => {
+		console.log(failure)
 		process.exit(1)
-	}
-}
-
-test({
-	beforeEachFile,
-	beforeEachTest,
-	afterEachTest,
-	afterEachFile
-}).then(report => afterAll(report, true), report => afterAll(report, false))
+	},
+)
