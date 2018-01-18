@@ -14,15 +14,6 @@ import {
 
 /* istanbul ignore next: internal usage, not meant to be used nor maintained */
 export const autoExecute = (tests, { allocatedMs } = {}) => {
-	tests = tests.map(({ getLongDescription, fn, isFocused, isSkipped }) => {
-		return {
-			description: getLongDescription(),
-			implementation: fn,
-			focused: isFocused(),
-			skipped: isSkipped(),
-		}
-	})
-
 	const appendResult = (string, value) => {
 		if (value) {
 			return `${string} with ${value}`

@@ -1,10 +1,35 @@
 import { mixin } from "@dmail/mixin"
-import { createAction, allocableMsTalent, compose, createIterator } from "@dmail/action"
+import {
+	createAction,
+	allocableMsTalent,
+	compose,
+	createIterator,
+	reduce,
+	passed,
+} from "@dmail/action"
 
 export const executeOne = (
-	{ description, implementation, focused = false, skipped = false },
-	{ onReady = () => {}, onEnd = () => {}, allocatedMs = Infinity, ...props } = {},
+	{ fn, isFocused, isSkipped, getScenarios, fileName, lineNumber, columnNumber },
+	{ onReady = () => {}, onEnd = () => {}, allocatedMs = Infinity } = {},
 ) => {
+	const description = `${fileName}:${lineNumber}:${columnNumber}`
+
+	const implementation = (data = {}) => {
+		return reduce(
+			getScenarios(),
+			(data, scenario) => {
+				return passed(scenario.generate(data)).then((output) => {
+					return { ...data, output }
+				})
+			},
+			data,
+		).then((data) => fn(data))
+	}
+
+	const focused = isFocused()
+
+	const skipped = isSkipped()
+
 	const startMs = Date.now()
 	onReady({ description, focused, skipped, startMs })
 
@@ -14,13 +39,7 @@ export const executeOne = (
 	if (skipped) {
 		action.pass()
 	} else {
-		action.pass(
-			implementation({
-				startMs,
-				allocatedMs,
-				...props,
-			}),
-		)
+		action.pass(implementation())
 	}
 
 	const end = (value, passed) => {

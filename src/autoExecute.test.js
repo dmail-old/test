@@ -11,9 +11,12 @@ test("autoExecute", ({ ensure, waitUntil }) => {
 		autoExecute(
 			[
 				{
-					getLongDescription: () => "long",
+					fileName: "file",
+					lineNumber: 5,
+					columnNumber: 10,
 					isSkipped: () => false,
 					isFocused: () => false,
+					getScenarios: () => [],
 					fn: () => action,
 				},
 			],

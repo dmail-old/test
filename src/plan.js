@@ -79,24 +79,20 @@ const skippable = () => {
 	return { isSkipped, skip }
 }
 
-const createTest = ({ description, fn }) => {
+const createTest = ({ fn, fileName, lineNumber, columnNumber }) => {
 	return mixin(pure, focusable, skippable, () => {
 		const scenarios = []
 		const setScenarios = (value) => {
 			scenarios.push(...value)
 		}
 
-		const getLongDescription = () => {
-			return scenarios.reduce((previous, scenario) => {
-				return `${scenario.description} ${previous}`
-			}, description)
-		}
+		const getScenarios = () => scenarios
 
-		return { description, fn, setScenarios, getLongDescription }
+		return { fn, fileName, lineNumber, columnNumber, setScenarios, getScenarios }
 	})
 }
 
-const createScenario = ({ description, fn }) => {
+const createScenario = ({ generate, ensure }) => {
 	return mixin(pure, focusable, skippable, () => {
 		const tests = []
 		const getTests = () => tests
@@ -112,51 +108,82 @@ const createScenario = ({ description, fn }) => {
 			scenarios.push(...value)
 		}
 
-		return { description, fn, getTests, setTests, getScenarios, setScenarios }
+		return { generate, ensure, getTests, setTests, getScenarios, setScenarios }
 	})
 }
 
-const createPlan = ({ description, fn }) => {
+// https://github.com/v8/v8/wiki/Stack-Trace-API
+const getExternalCallerStack = () => {
+	const { prepareStackTrace } = Error
+	let callerStack
+
+	try {
+		const error = new Error()
+
+		Error.prepareStackTrace = (error, stack) => stack
+
+		const stack = error.stack
+		const currentFileName = stack[0].getFileName()
+
+		callerStack = stack.slice(1).find((callStack) => {
+			return callStack.getFileName() !== currentFileName
+		})
+	} catch (e) {}
+
+	Error.prepareStackTrace = prepareStackTrace
+
+	return callerStack
+}
+
+const createPlan = ({ fn }) => {
 	return mixin(pure, focusable, skippable, ({ isFocused, isSkipped, getLastComposite }) => {
 		const createRootScenario = () => {
 			const tests = []
-			const discoverTest = (description, fn) => {
+			const discoverTest = (fn) => {
+				const caller = getExternalCallerStack()
+				const fileName = caller.getFileName()
+				const lineNumber = caller.getLineNumber()
+				const columnNumber = caller.getColumnNumber()
 				const test = createTest({
-					description,
 					fn,
+					fileName,
+					lineNumber,
+					columnNumber,
 				})
 				tests.push(test)
 				return test
 			}
-			const test = (description, fn) => discoverTest(description, fn)
-			test.focus = (description, fn) => {
-				const test = discoverTest(description, fn)
+
+			// https://github.com/stefanpenner/get-caller-file
+			const test = (fn) => discoverTest(fn)
+			test.focus = (fn) => {
+				const test = discoverTest(fn)
 				test.focus()
 				return test
 			}
-			test.skip = (description, fn) => {
-				const test = discoverTest(description, fn)
+			test.skip = (fn) => {
+				const test = discoverTest(fn)
 				test.skip()
 				return test
 			}
 
 			const scenarios = []
-			const discoverScenario = (description, fn) => {
+			const discoverScenario = (generate, ensure) => {
 				const scenario = createScenario({
-					description,
-					fn,
+					generate,
+					ensure,
 				})
 				scenarios.push(scenario)
 				return scenario
 			}
-			const scenario = (description, fn) => discoverScenario(description, fn)
-			scenario.focus = (description, fn) => {
-				const scenario = discoverScenario(description, fn)
+			const scenario = (generate, ensure) => discoverScenario(generate, ensure)
+			scenario.focus = (generate, ensure) => {
+				const scenario = discoverScenario(generate, ensure)
 				scenario.focus()
 				return scenario
 			}
-			scenario.skip = (description, fn) => {
-				const scenario = discoverScenario(description, fn)
+			scenario.skip = (generate, ensure) => {
+				const scenario = discoverScenario(generate, ensure)
 				scenario.skip()
 				return scenario
 			}
@@ -165,7 +192,7 @@ const createPlan = ({ description, fn }) => {
 				scenariosToVisit.forEach((scenarioToVisit) => {
 					tests.length = 0
 					scenarios.length = 0
-					scenarioToVisit.fn()
+					scenarioToVisit.ensure()
 					scenarioToVisit.setTests(tests)
 					scenarioToVisit.setScenarios(scenarios)
 					visitScenarios(scenarioToVisit.getScenarios())
@@ -174,7 +201,7 @@ const createPlan = ({ description, fn }) => {
 
 			fn({ test, scenario })
 
-			const rootScenario = createScenario({ description })
+			const rootScenario = createScenario({})
 			if (isFocused()) {
 				rootScenario.focus()
 			}
@@ -191,18 +218,18 @@ const createPlan = ({ description, fn }) => {
 
 		const autorun = () => autoExecute(collect(getLastComposite()), { allocatedMs: 100 })
 
-		return { description, createRootScenario, ["@@autorun"]: autorun }
+		return { createRootScenario, ["@@autorun"]: autorun }
 	})
 }
 
-const plan = (description, fn) => createPlan({ description, fn })
-plan.focus = (description, fn) => {
-	const plan = createPlan({ description, fn })
+const plan = (fn) => createPlan({ fn })
+plan.focus = (fn) => {
+	const plan = createPlan({ fn })
 	plan.focus()
 	return plan
 }
-plan.skip = (description, fn) => {
-	const plan = createPlan({ description, fn })
+plan.skip = (fn) => {
+	const plan = createPlan({ fn })
 	plan.skip()
 	return plan
 }

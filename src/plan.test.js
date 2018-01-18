@@ -1,35 +1,73 @@
 import { plan, collect } from "./plan.js"
+import { executeOne } from "./execute.js"
 import { test } from "@dmail/test-cheap"
+// import { createSpy } from "@dmail/spy"
 import assert from "assert"
 
+const assertTestIsAndCalledWith = (test, id, param) => {
+	const action = executeOne(test)
+	assert.equal(action.getState(), "passed")
+	const result = action.getResult()
+	const testReturnValue = result.value
+	assert.equal(testReturnValue.id, id)
+	assert.equal(testReturnValue.args.length, 1)
+	assert.deepEqual(testReturnValue.args[0], param)
+}
+
 test("plan", ({ ensure }) => {
-	ensure("collect and longDescriptions", () => {
-		const testPlan = plan("yo", ({ test, scenario }) => {
-			test("testA", () => {})
+	ensure("collect and execute", () => {
+		const testPlan = plan(({ test, scenario }) => {
+			test((...args) => ({
+				id: "test-1",
+				args,
+			}))
 
-			scenario("scenarioA", () => {
-				test("testB", () => {})
+			scenario(
+				() => {
+					const count = 1
+					return { count }
+				},
+				() => {
+					test((...args) => ({
+						id: "test-3",
+						args,
+					}))
 
-				scenario("scenarioAA", () => {
-					test("testC", () => {})
-				})
+					scenario(
+						({ count }) => {
+							const incrementedCount = count + 1
+							return { incrementedCount }
+						},
+						() => {
+							test((...args) => ({
+								id: "test-5",
+								args,
+							}))
+						},
+					)
 
-				test("testD", () => {})
-			})
+					test((...args) => ({
+						id: "test-4",
+						args,
+					}))
+				},
+			)
 
-			test("testE", () => {})
+			test((...args) => ({
+				id: "test-2",
+				args,
+			}))
 		})
 		const tests = collect(testPlan)
-		const longDescriptions = tests.map((test) => test.getLongDescription())
-		assert.deepEqual(longDescriptions, [
-			"yo testA",
-			"yo testE",
-			"yo scenarioA testB",
-			"yo scenarioA testD",
-			"yo scenarioA scenarioAA testC",
-		])
+
+		assertTestIsAndCalledWith(tests[0], "test-1", {})
+		assertTestIsAndCalledWith(tests[1], "test-2", {})
+		assertTestIsAndCalledWith(tests[2], "test-3", { count: 1 })
+		assertTestIsAndCalledWith(tests[3], "test-4", { count: 1 })
+		assertTestIsAndCalledWith(tests[4], "test-5", { count: 1, incrementedCount: 2 })
 	})
 
+	/*
 	ensure("collect and focus", () => {
 		const testPlan = plan("foo", ({ test, scenario }) => {
 			scenario("bar", () => {
@@ -58,4 +96,5 @@ test("plan", ({ ensure }) => {
 		assert.deepEqual(skippedTestDescriptions, ["a", "d", "c"])
 		assert.deepEqual(focusedTestDescriptions, [])
 	})
+	*/
 })
