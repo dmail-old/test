@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
 import nodepath from "path"
-import { passed, failed, chainFunctions, sequence } from "@dmail/action"
+import { passed, chainFunctions, sequence } from "@dmail/action"
 import { findSourceFiles, findFilesForTest } from "../src/findFiles.js"
 import { autoExecute } from "../src/autoExecute.js"
-import { collect } from "../src/plan.js"
+import { collect } from "../src/createTest.js"
 
 const requireAllSourceFiles = (location) => {
 	return findSourceFiles(location).then((sourceFiles) =>
@@ -15,18 +15,9 @@ const requireAllSourceFiles = (location) => {
 	)
 }
 
-const exportName = "test"
-const getExportedPlan = (location) => {
-	const fileExports = require(location) // eslint-disable-line import/no-dynamic-require
-	if (exportName in fileExports === false) {
-		// it's allowed to omit the export
-		return passed(null)
-	}
-	const exportedValue = fileExports[exportName]
-	if (typeof exportedValue !== "object" || typeof exportedValue.createRootScenario !== "function") {
-		return failed(`file ${exportName} export must be a plan`)
-	}
-	return passed(exportedValue)
+const getTests = (location) => {
+	require(location) // eslint-disable-line import/no-dynamic-require
+	return passed(collect())
 }
 
 const cwd = process.cwd()
@@ -38,9 +29,8 @@ chainFunctions(
 	// instead of requiring them manually
 	() => requireAllSourceFiles(cwd),
 	() => findFilesForTest(cwd),
-	(files) => sequence(files, (file) => getExportedPlan(nodepath.resolve(cwd, file))),
-	(plans) => plans.filter((plan) => plan !== null),
-	(plans) => collect(...plans),
+	(files) => sequence(files, (file) => getTests(nodepath.resolve(cwd, file))),
+	(filesTests) => filesTests.reduce((accumulator, tests) => accumulator.concat(tests), []),
 ).then(
 	(tests) =>
 		autoExecute(tests, { allocatedMs: 100 }).then(() => process.exit(0), () => process.exit(1)),

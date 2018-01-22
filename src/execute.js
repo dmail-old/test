@@ -1,30 +1,13 @@
 import { mixin } from "@dmail/mixin"
-import {
-	createAction,
-	allocableMsTalent,
-	compose,
-	createIterator,
-	reduce,
-	passed,
-} from "@dmail/action"
+import { createAction, allocableMsTalent, compose, createIterator, passed } from "@dmail/action"
 
 export const executeOne = (
-	{ fn, isFocused, isSkipped, getScenarios, fileName, lineNumber, columnNumber },
+	{ fn, isFocused, isSkipped, fileName, lineNumber, columnNumber },
 	{ onReady = () => {}, onEnd = () => {}, allocatedMs = Infinity } = {},
 ) => {
 	const description = `${fileName}:${lineNumber}:${columnNumber}`
 
-	const implementation = (data = {}) => {
-		return reduce(
-			getScenarios(),
-			(data, scenario) => {
-				return passed(scenario.generate(data)).then((output) => {
-					return { ...data, output }
-				})
-			},
-			data,
-		).then((data) => fn(data))
-	}
+	const implementation = () => passed(fn())
 
 	const focused = isFocused()
 
@@ -61,7 +44,17 @@ export const executeOne = (
 	return action.then((value) => end(value, true), (value) => end(value, false))
 }
 
-export const executeMany = (tests, props = {}) => {
+export const executeMany = (tests, props) => {
+	const someTestIsFocused = tests.some(({ isFocused }) => isFocused())
+
+	if (someTestIsFocused) {
+		tests.forEach(({ isFocused, skip }) => {
+			if (isFocused() === false) {
+				skip()
+			}
+		})
+	}
+
 	const values = []
 	let someHasFailed = false
 
