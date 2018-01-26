@@ -1,11 +1,18 @@
 import { mixin } from "@dmail/mixin"
-import { createAction, allocableMsTalent, compose, createIterator } from "@dmail/action"
+import { createAction, allocableMsTalent, compose, createIterator, passed } from "@dmail/action"
 
 export const executeOne = (
-	{ description, implementation, focused = false, skipped = false },
-	{ onReady = () => {}, onEnd = () => {}, allocatedMs = Infinity, ...props } = {},
+	{ fn, isFocused, isSkipped, description },
+	{ onReady = () => {}, onEnd = () => {}, allocatedMs = Infinity } = {},
 ) => {
+	const implementation = () => passed(fn())
+
+	const focused = isFocused()
+
+	const skipped = isSkipped()
+
 	const startMs = Date.now()
+
 	onReady({ description, focused, skipped, startMs })
 
 	const action = mixin(createAction(), allocableMsTalent)
@@ -14,13 +21,7 @@ export const executeOne = (
 	if (skipped) {
 		action.pass()
 	} else {
-		action.pass(
-			implementation({
-				startMs,
-				allocatedMs,
-				...props,
-			}),
-		)
+		action.pass(implementation())
 	}
 
 	const end = (value, passed) => {
@@ -42,7 +43,7 @@ export const executeOne = (
 	return action.then((value) => end(value, true), (value) => end(value, false))
 }
 
-export const executeMany = (tests, props = {}) => {
+export const executeMany = (tests, props) => {
 	const values = []
 	let someHasFailed = false
 

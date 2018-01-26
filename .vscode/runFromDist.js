@@ -44,11 +44,9 @@ if (resolvedFile.indexOf(compiledDirectory) === 0) {
 const fileRelativeToPackageDirectory = path.relative(packageDirectory, resolvedFile)
 const distFile = path.join(compiledDirectory, fileRelativeToPackageDirectory)
 
-// execute using require (this way process.args like --inspect are fowarded)
-const namedExports = require(distFile)
-if (namedExports && "default" in namedExports) {
-	const defaultExport = namedExports["default"]
-	if (defaultExport.hasOwnProperty("@@autorun")) {
-		defaultExport["@@autorun"]()
-	}
-}
+// const { autoExecute, collect } = require("@dmail/test")
+// // execute using require (this way process.args like --inspect are fowarded)
+// require(distFile)
+// autoExecute(collect())
+
+require(distFile)

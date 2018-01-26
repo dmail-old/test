@@ -7,15 +7,14 @@
 Nodejs test runner
 
 ```javascript
-import { plan } from "@dmail/test"
+import { test } from "@dmail/test"
+import assert from "assert"
 
-export const test = plan("feature", ({ test, scenario }) => {
-	scenario("subfeature", () => {
-		test("foo", () => {})
+test(() => {
+	assert.equal(0, 0)
+})
 
-		scenario("other plan", () => {
-			test("bar", () => {})
-		})
-	})
+test(() => {
+	assert.equal(1, 1)
 })
 ```
