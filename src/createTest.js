@@ -1,88 +1,110 @@
 import { pure, mixin } from "@dmail/mixin"
+import path from "path"
+import { remap } from "./remapCallSite.js"
 
 const tests = []
 
-const focusable = () => {
-	let focused = false
-
-	const focus = () => {
-		focused = true
+const replaceTest = (test, nextTest) => {
+	const index = tests.indexOf(test)
+	if (index > -1) {
+		tests[index] = nextTest
 	}
-
-	const isFocused = () => focused
-
-	return { isFocused, focus }
 }
 
-const skippable = () => {
-	let skipped = false
+const createTest = ({ fn, fileName, lineNumber, columnNumber }) => {
+	return mixin(pure, (test) => {
+		const isFocused = () => false
 
-	const skip = () => {
-		skipped = true
-	}
+		const focus = () => {
+			const focusedTest = mixin(test, () => ({ isFocused: () => true }))
+			replaceTest(test, focusedTest)
+			return focusedTest
+		}
 
-	const isSkipped = () => skipped
+		const isSkipped = () => false
 
-	return { isSkipped, skip }
-}
+		const skip = () => {
+			const skippedTest = mixin(test, () => ({ isSkipped: () => true }))
+			replaceTest(test, skippedTest)
+			return skippedTest
+		}
 
-const createTest = ({ fn, description, fileName, lineNumber, columnNumber }) => {
-	return mixin(pure, focusable, skippable, () => {
-		return { fn, description, fileName, lineNumber, columnNumber }
+		const dirname = path.relative(process.cwd(), fileName)
+		// https://github.com/Microsoft/vscode/issues/27713
+		// we also have to sourcemap the fileName, lineNumber & columnNumber
+		const description = `${dirname}:${lineNumber}:${columnNumber}`
+
+		return {
+			description,
+			fn,
+			focus,
+			isFocused,
+			skip,
+			isSkipped,
+		}
 	})
 }
 
 // https://github.com/v8/v8/wiki/Stack-Trace-API
-const getExternalCallerStack = () => {
+const getExternalCallerCallSite = () => {
 	const { prepareStackTrace } = Error
-	let callerStack
+	let callSites
+	let callSite
 
 	try {
 		const error = new Error()
 
 		Error.prepareStackTrace = (error, stack) => stack
 
-		const stack = error.stack
-		const currentFileName = stack[0].getFileName()
+		callSites = error.stack
+		const currentFileName = callSites[0].getFileName()
 
-		callerStack = stack.slice(1).find((callStack) => {
+		callSite = callSites.slice(1).find((callStack) => {
 			return callStack.getFileName() !== currentFileName
 		})
 	} catch (e) {}
 
 	Error.prepareStackTrace = prepareStackTrace
 
-	return callerStack
+	return remap(callSite, callSites)
 }
 
 const test = (fn) => {
 	// https://github.com/stefanpenner/get-caller-file
-	const caller = getExternalCallerStack()
-	const fileName = caller.getFileName()
-	const lineNumber = caller.getLineNumber()
-	const columnNumber = caller.getColumnNumber()
+	const callSite = getExternalCallerCallSite()
+	const fileName = callSite.getFileName()
+	const lineNumber = callSite.getLineNumber()
+	const columnNumber = callSite.getColumnNumber()
+
 	const test = createTest({
 		fn,
 		fileName,
 		lineNumber,
 		columnNumber,
 	})
+
 	tests.push(test)
 
 	return test
 }
-
-test.focus = (fn) => {
-	const theTest = test(fn)
-	theTest.focus()
-	return theTest
-}
-test.skip = (fn) => {
-	const theTest = test(fn)
-	theTest.skip()
-	return theTest
-}
-
+test.focus = (fn) => test(fn).focus()
+test.skip = (fn) => test(fn).skip()
 export { test }
 
-export const collect = () => tests
+export const collect = () => {
+	const collectedTests = tests.slice()
+	tests.length = 0
+
+	const someTestIsFocused = collectedTests.some(({ isFocused }) => isFocused())
+
+	if (someTestIsFocused) {
+		return collectedTests.map((test) => {
+			if (test.isFocused()) {
+				return test
+			}
+			return test.skip()
+		})
+	}
+
+	return collectedTests
+}

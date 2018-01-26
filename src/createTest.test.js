@@ -1,50 +1,24 @@
-import { test as createTest, collect } from "./createTest.js"
-// import { executeOne } from "./execute.js"
-import { test } from "@dmail/test-cheap"
-// import { createSpy } from "@dmail/spy"
+import { test, collect } from "./createTest.js"
+import { test as testCheap } from "@dmail/test-cheap"
 import assert from "assert"
 
-test("createTest", ({ ensure }) => {
+testCheap("createTest", ({ ensure }) => {
 	ensure("collect", () => {
-		const testA = createTest(() => {})
-		const testB = createTest(() => {})
+		const testA = test(() => {})
+		const testB = test(() => {})
 		const tests = collect()
 
 		assert.deepEqual(tests, [testA, testB])
 	})
 
-	ensure("collect with test.focus", () => {})
+	ensure("collect with test.focus", () => {
+		const fn = () => {}
+		test(fn)
+		test.focus(() => {})
+		const tests = collect()
 
-	ensure("collect using test.skip", () => {})
-
-	/*
-	ensure("collect and focus", () => {
-		const testPlan = plan("foo", ({ test, scenario }) => {
-			scenario("bar", () => {
-				test("a")
-				scenario("hhj", () => {
-					test("d")
-				})
-			})
-
-			scenario.focus("yyy", () => {
-				test("b")
-			})
-
-			scenario("zzz", () => {
-				test("c")
-			})
-		})
-		const tests = collect(testPlan)
-		const skippedTestDescriptions = tests
-			.filter((test) => test.isSkipped())
-			.map((test) => test.description)
-		const focusedTestDescriptions = tests
-			.filter((test) => test.isFocused())
-			.map((test) => test.description)
-
-		assert.deepEqual(skippedTestDescriptions, ["a", "d", "c"])
-		assert.deepEqual(focusedTestDescriptions, [])
+		assert.equal(tests[0].fn, fn)
+		assert.equal(tests[0].isSkipped(), true)
+		assert.equal(tests[1].isFocused(), true)
 	})
-	*/
 })

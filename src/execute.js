@@ -2,11 +2,9 @@ import { mixin } from "@dmail/mixin"
 import { createAction, allocableMsTalent, compose, createIterator, passed } from "@dmail/action"
 
 export const executeOne = (
-	{ fn, isFocused, isSkipped, fileName, lineNumber, columnNumber },
+	{ fn, isFocused, isSkipped, description },
 	{ onReady = () => {}, onEnd = () => {}, allocatedMs = Infinity } = {},
 ) => {
-	const description = `${fileName}:${lineNumber}:${columnNumber}`
-
 	const implementation = () => passed(fn())
 
 	const focused = isFocused()
@@ -14,6 +12,7 @@ export const executeOne = (
 	const skipped = isSkipped()
 
 	const startMs = Date.now()
+
 	onReady({ description, focused, skipped, startMs })
 
 	const action = mixin(createAction(), allocableMsTalent)
@@ -45,16 +44,6 @@ export const executeOne = (
 }
 
 export const executeMany = (tests, props) => {
-	const someTestIsFocused = tests.some(({ isFocused }) => isFocused())
-
-	if (someTestIsFocused) {
-		tests.forEach(({ isFocused, skip }) => {
-			if (isFocused() === false) {
-				skip()
-			}
-		})
-	}
-
 	const values = []
 	let someHasFailed = false
 

@@ -3,7 +3,6 @@ import {
 	forcedIcon,
 	passedIcon,
 	failedIcon,
-	skippedIcon,
 	passedColor,
 	failedColor,
 	skippedColor,
@@ -21,14 +20,17 @@ export const autoExecute = (tests, { allocatedMs } = {}) => {
 		return string
 	}
 
-	const onReady = ({ description, forced }) => {
+	const onReady = ({ description, forced, skipped }) => {
+		if (skipped) {
+			return
+		}
 		console.log("")
 		console.log(forced ? `${forcedIcon} ${description}` : description)
 	}
 
 	const onEnd = ({ skipped, passed, expired, value }) => {
 		if (skipped) {
-			console.log(appendResult(`${skippedColor}${skippedIcon} skipped${endColor}`, value))
+			// console.log(appendResult(`${skippedColor}${skippedIcon} skipped${endColor}`, value))
 		} else if (expired) {
 			console.log(appendResult(`${expiredColor}${expiredIcon} expired${endColor}`, value))
 		} else if (passed) {
@@ -42,25 +44,17 @@ export const autoExecute = (tests, { allocatedMs } = {}) => {
 		const testResults = data
 		const testCount = testResults.length
 		const skippedCount = testResults.filter(({ skipped }) => skipped).length
-		const passedCount = testResults.filter(({ passed }) => passed).length
+		const passedCount = testResults.filter(({ passed, skipped }) => passed && skipped === false)
+			.length
 		const failedCount = testResults.filter(({ passed }) => passed === false).length
 
+		const categories = []
+		categories.push(`${passedColor}${passedCount} passed${endColor}`)
+		categories.push(`${failedColor}${failedCount} failed${endColor}`)
+		categories.push(`${skippedColor}${skippedCount} skipped${endColor}`)
+
 		console.log("")
-		if (failedCount === 0) {
-			console.log(
-				`${passedColor}${passedIcon} ${passedCount} tests passed${endColor} on ${testCount}${endColor}`,
-			)
-			if (skippedCount > 0) {
-				console.log(`${skippedColor}${skippedIcon} ${skippedCount} tests skipped${endColor}`)
-			}
-		} else {
-			console.log(
-				`${failedColor}${failedIcon} ${failedCount} failed tests on ${testCount}${endColor}`,
-			)
-			if (skippedCount > 0) {
-				console.log(`${skippedColor}${skippedIcon} ${skippedCount} tests skipped${endColor}`)
-			}
-		}
+		console.log(`${testCount} tests: ${categories.join(", ")}`)
 	}
 
 	const before = () => {

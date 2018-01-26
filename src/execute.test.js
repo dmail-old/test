@@ -1,23 +1,23 @@
+import { test } from "./createTest.js"
 import { executeOne, executeMany } from "./execute.js"
-import { test } from "@dmail/test-cheap"
+import { test as testCheap } from "@dmail/test-cheap"
 import { createAction, failed } from "@dmail/action"
 import { createSpy } from "@dmail/spy"
 import assert from "assert"
 import { install } from "lolex"
 
-test("execute", ({ ensure }) => {
+testCheap("execute", ({ ensure }) => {
 	ensure("executeOne basics", () => {
 		const clock = install()
-		const description = "desc"
+
 		const action = createAction()
-		const implementation = () => action
+		const theTest = test(() => action)
+		const description = theTest.description
 		const onReady = createSpy()
 		const onEnd = createSpy()
 		const nowMs = Date.now()
-		const testExecution = executeOne(
-			{ description, implementation },
-			{ onReady, onEnd, allocatedMs: 10 },
-		)
+
+		const testExecution = executeOne(theTest, { onReady, onEnd, allocatedMs: 10 })
 
 		clock.tick(9)
 		action.pass("hello world")
@@ -58,10 +58,10 @@ test("execute", ({ ensure }) => {
 	})
 
 	ensure("executeOne implementation failed", () => {
-		const description = "desc"
 		const value = 1
-		const implementation = () => failed(value)
-		const testExecution = executeOne({ description, implementation })
+		const theTest = test(() => failed(value))
+		const testExecution = executeOne(theTest)
+
 		assert.equal(testExecution.isFailed(), true)
 		const result = testExecution.getResult()
 		assert.deepEqual(result.passed, false)
@@ -70,16 +70,16 @@ test("execute", ({ ensure }) => {
 
 	ensure("executeOne implementation taking too much time to pass", () => {
 		const clock = install()
+
 		const allocatedMs = 10
 		const requiredMs = 100
-		const description = "passing too late"
-		const implementation = () => {
+		const theTest = test(() => {
 			const action = createAction()
 			setTimeout(action.pass, requiredMs)
 			return action
-		}
+		})
 
-		const testExecution = executeOne({ description, implementation }, { allocatedMs })
+		const testExecution = executeOne(theTest, { allocatedMs })
 
 		assert.equal(testExecution.getState(), "unknown")
 		clock.tick(allocatedMs)
@@ -105,23 +105,17 @@ test("execute", ({ ensure }) => {
 
 	ensure("executeMany collect failures", () => {
 		const clock = install()
+
 		const nowMs = Date.now()
 		const firstValue = 1
 		const secondValue = 2
-		const execution = executeMany([
-			{
-				description: "first",
-				implementation: () => failed(firstValue),
-			},
-			{
-				description: "second",
-				implementation: () => failed(secondValue),
-			},
-		])
+		const firstTest = test(() => failed(firstValue))
+		const secondTest = test(() => failed(secondValue))
+		const execution = executeMany([firstTest, secondTest])
 
 		assert.deepEqual(execution.getResult(), [
 			{
-				description: "first",
+				description: firstTest.description,
 				focused: false,
 				skipped: false,
 				expired: false,
@@ -131,7 +125,7 @@ test("execute", ({ ensure }) => {
 				value: firstValue,
 			},
 			{
-				description: "second",
+				description: secondTest.description,
 				focused: false,
 				skipped: false,
 				expired: false,
