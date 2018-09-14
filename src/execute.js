@@ -6,7 +6,14 @@ export const executeOne = (
 	{ fn, isFocused, isSkipped, description },
 	{ before = () => {}, after = () => {}, allocatedMs = Infinity } = {},
 ) => {
-	const implementation = () => fn()
+	// the test may register a cleanup callback to remove stuff once done
+	// we're ;issing a way to kill the test while its running
+	let cleanupCallback = () => {}
+	const cleanup = (callback) => {
+		cleanupCallback = callback
+	}
+
+	const implementation = () => fn({ cleanup })
 
 	const focused = isFocused()
 
@@ -50,12 +57,14 @@ export const executeOne = (
 		}).then(
 			(arg) => {
 				clearTimeout(timeout)
+				cleanupCallback()
 				passed = true
 				value = arg
 				return end()
 			},
 			(reason) => {
 				clearTimeout(timeout)
+				cleanupCallback()
 				if (isAssertionError(reason)) {
 					passed = false
 					value = reason
@@ -68,6 +77,7 @@ export const executeOne = (
 			timeout = setTimeout(resolve, allocatedMs)
 		}).then(() => {
 			expired = true
+			cleanupCallback()
 			return end()
 		}),
 	])
