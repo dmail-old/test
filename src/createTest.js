@@ -1,7 +1,3 @@
-import { pure, mixin } from "@dmail/mixin"
-import path from "path"
-import { remap } from "./remapCallSite.js"
-
 const tests = []
 
 const replaceTest = (test, nextTest) => {
@@ -12,37 +8,51 @@ const replaceTest = (test, nextTest) => {
 }
 
 const createTest = ({ fn, fileName, lineNumber, columnNumber }) => {
-	return mixin(pure, (test) => {
-		const isFocused = () => false
+	const test = {}
 
-		const focus = () => {
-			const focusedTest = mixin(test, () => ({ isFocused: () => true }))
-			replaceTest(test, focusedTest)
-			return focusedTest
+	const isFocused = () => false
+
+	const focus = () => {
+		const focusedTest = {
+			...test,
+			...{
+				isFocused: () => true,
+			},
 		}
+		replaceTest(test, focusedTest)
 
-		const isSkipped = () => false
+		return focusedTest
+	}
 
-		const skip = () => {
-			const skippedTest = mixin(test, () => ({ isSkipped: () => true }))
-			replaceTest(test, skippedTest)
-			return skippedTest
+	const isSkipped = () => false
+
+	const skip = () => {
+		const skippedTest = {
+			...test,
+			...{
+				isSkipped: () => true,
+			},
 		}
+		replaceTest(test, skippedTest)
 
-		const dirname = path.relative(process.cwd(), fileName)
-		// https://github.com/Microsoft/vscode/issues/27713
-		// we also have to sourcemap the fileName, lineNumber & columnNumber
-		const description = `${dirname}:${lineNumber}:${columnNumber}`
+		return skippedTest
+	}
 
-		return {
-			description,
-			fn,
-			focus,
-			isFocused,
-			skip,
-			isSkipped,
-		}
+	// const dirname = path.relative(process.cwd(), fileName)
+	// https://github.com/Microsoft/vscode/issues/27713
+	// we also have to sourcemap the fileName, lineNumber & columnNumber
+	const description = `${fileName}:${lineNumber}:${columnNumber}`
+
+	Object.assign(test, {
+		description,
+		fn,
+		focus,
+		isFocused,
+		skip,
+		isSkipped,
 	})
+
+	return Object.freeze(test)
 }
 
 // https://github.com/v8/v8/wiki/Stack-Trace-API
@@ -66,7 +76,7 @@ const getExternalCallerCallSite = () => {
 
 	Error.prepareStackTrace = prepareStackTrace
 
-	return remap(callSite, callSites)
+	return callSite
 }
 
 const test = (fn) => {
@@ -89,6 +99,7 @@ const test = (fn) => {
 }
 test.focus = (fn) => test(fn).focus()
 test.skip = (fn) => test(fn).skip()
+
 export { test }
 
 export const collect = () => {
@@ -106,5 +117,5 @@ export const collect = () => {
 		})
 	}
 
-	return collectedTests
+	return Promise.all(collectedTests)
 }

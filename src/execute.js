@@ -1,11 +1,12 @@
-import { mixin } from "@dmail/mixin"
-import { createAction, allocableMsTalent, compose, createIterator, passed } from "@dmail/action"
+export const isAssertionError = () => false
+
+export const createAssertionError = () => {}
 
 export const executeOne = (
 	{ fn, isFocused, isSkipped, description },
-	{ onReady = () => {}, onEnd = () => {}, allocatedMs = Infinity } = {},
+	{ before = () => {}, after = () => {}, allocatedMs = Infinity } = {},
 ) => {
-	const implementation = () => passed(fn())
+	const implementation = () => fn()
 
 	const focused = isFocused()
 
@@ -13,18 +14,15 @@ export const executeOne = (
 
 	const startMs = Date.now()
 
-	onReady({ description, focused, skipped, startMs })
+	before({ description, focused, skipped, startMs })
 
-	const action = mixin(createAction(), allocableMsTalent)
-	const expirationToken = action.allocateMs(allocatedMs)
+	let expired = false
 
-	if (skipped) {
-		action.pass()
-	} else {
-		action.pass(implementation())
-	}
+	let passed = false
 
-	const end = (value, passed) => {
+	let value
+
+	const end = () => {
 		const endMs = Date.now()
 		const result = {
 			description,
@@ -32,38 +30,54 @@ export const executeOne = (
 			skipped,
 			startMs,
 			endMs,
-			expired: value === expirationToken,
+			expired,
 			passed,
 			value,
 		}
-		onEnd(result)
+		after(result)
 		return result
 	}
 
-	return action.then((value) => end(value, true), (value) => end(value, false))
+	if (skipped) {
+		return Promise.resolve(end())
+	}
+
+	let timeout
+
+	return Promise.race([
+		new Promise((resolve) => {
+			resolve(implementation())
+		}).then(
+			(arg) => {
+				clearTimeout(timeout)
+				passed = true
+				value = arg
+				return end()
+			},
+			(reason) => {
+				clearTimeout(timeout)
+				if (isAssertionError(reason)) {
+					passed = false
+					value = reason
+					return end()
+				}
+				return Promise.reject(reason)
+			},
+		),
+		new Promise((resolve) => {
+			timeout = setTimeout(resolve, allocatedMs)
+		}).then(() => {
+			expired = true
+			return end()
+		}),
+	])
 }
 
-export const executeMany = (tests, props) => {
-	const values = []
-	let someHasFailed = false
-
-	return compose({
-		iterator: createIterator(tests),
-		composer: ({ value, state, index, nextValue, done, fail, pass }) => {
-			if (index > -1) {
-				values.push(value)
-			}
-			if (state === "failed") {
-				someHasFailed = true
-			}
-			if (done) {
-				if (someHasFailed) {
-					return fail(values)
-				}
-				return pass(values)
-			}
-
-			return executeOne(nextValue, props)
-		},
-	})
+export const executeMany = (tests, options) => {
+	// we could add an option to run them in sequence rather than parallel
+	return Promise.all(
+		tests.map((test) => {
+			return executeOne(test, options)
+		}),
+	)
 }
