@@ -4,17 +4,23 @@
 [![build](https://travis-ci.org/dmail/test.svg?branch=master)](http://travis-ci.org/dmail/test)
 [![codecov](https://codecov.io/gh/dmail/test/branch/master/graph/badge.svg)](https://codecov.io/gh/dmail/test)
 
-Nodejs test runner
+Test runner
 
 ```javascript
-import { test } from "@dmail/test"
+import { createSuite } from "@dmail/test"
 import assert from "assert"
 
-test(() => {
-	assert.equal(0, 0)
+const suite = createSuite(({ test }) => {
+  test(() => {
+    assert.equal(0, 0)
+  })
+
+  test(() => {
+    assert.equal(1, 1)
+  })
 })
 
-test(() => {
-	assert.equal(1, 1)
-})
+// le fait qu'on puisse recup l'output c'est cool mais relou aussi parce au'il faut l'ecrire a chaque fois
+// ca serais mieux si on arrivait a lr ecup grace aux logs ou un truc comme ca
+export const output = suite.output
 ```

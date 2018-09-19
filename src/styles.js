@@ -1,6 +1,6 @@
 export const endColor = "\x1b[0m"
 
-export const forcedIcon = "\u2755" // sparkles ✨
+export const exclusiveIcon = "\u2755" // sparkles ✨
 
 export const passedColor = "\x1b[32m" // green
 export const passedIcon = "\u2714" // checkmark ✔
